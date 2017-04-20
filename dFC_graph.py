@@ -222,7 +222,7 @@ def cal_between_weight(matrix, ci):
 # 	return g
 
 subject, sequence, roi, w = raw_input().split()
-MTD = cal_MTD(subject , sequence, roi, w)
+MTD = cal_MTD(subject , sequence, roi, int(w))
 ci, q, PC, WMD, WW, BW = cal_dynamic_graph(MTD)
 
 fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_ci' %(subject,sequence,roi,w)
