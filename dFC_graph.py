@@ -73,81 +73,6 @@ def cal_MTD(subject , sequence, roi, w):
 	_, MTD = coupling(ts, w) #the smoothing window is set to 14 for HCP, for NKI 645 15
 
 	return MTD #the dimension of MTD is time by ROI by ROI
-
-
-class brain_graph:
-	def __init__(self, VC):
-		assert (np.unique(VC.membership) == range(len(VC.sizes()))).all()
-		node_degree_by_community = np.zeros((VC.graph.vcount(),len(VC.sizes())),dtype=np.float64)
-		for node1 in range(VC.graph.vcount()):
-			for comm_idx in (np.unique(VC.membership)):
-				comm_total_degree = 0.
-				for node2 in np.argwhere(np.array(VC.membership)==comm_idx).reshape(-1):
-					eid = VC.graph.get_eid(node1,node2,error=False)
-					if eid == - 1:
-						continue
-					weight = VC.graph.es[eid]["weight"]
-					comm_total_degree = comm_total_degree + weight
-				node_degree_by_community[node1,comm_idx] = comm_total_degree
-		pc_array = np.zeros(VC.graph.vcount())
-		for node in range(VC.graph.vcount()):
-		    assert np.isclose(VC.graph.strength(node,weights='weight'),np.nansum(node_degree_by_community[node]))
-		    # node_degree = np.nansum(node_degree_by_community[node])
-		    node_degree = VC.graph.strength(node,weights='weight')
-		    if node_degree == 0.0: 
-		        pc_array[node]= np.nan
-		        continue    
-		    pc = 0.0
-		    for idx,comm_degree in enumerate(node_degree_by_community[node]):
-		        pc = pc + ((float(comm_degree)/float(node_degree))**2)
-		    pc = 1.0 - pc
-		    pc_array[int(node)] = float(pc)
-		self.pc = pc_array
-		wmd_array = np.zeros(VC.graph.vcount())
-		for comm_idx in range(len(VC.sizes())):
-			comm = np.argwhere(np.array(VC.membership)==comm_idx).reshape(-1)
-			comm_std = np.std(node_degree_by_community[comm,comm_idx],dtype=np.float64)
-			comm_mean = np.mean(node_degree_by_community[comm,comm_idx],dtype=np.float64)
-			for node in comm:
-				# node_degree = np.nansum(node_degree_by_community[node])
-				node_degree = VC.graph.strength(node,weights='weight')
-				comm_node_degree = node_degree_by_community[node,comm_idx]
-				if node_degree == 0.0:
-					wmd_array[node] = np.nan
-					continue
-				if comm_std == 0.0:
-					assert comm_node_degree == comm_mean
-					wmd_array[node] = 0.0
-					continue
-				wmd_array[node] = np.divide((np.subtract(comm_node_degree,comm_mean)),comm_std)
-		self.wmd = wmd_array
-		self.community = VC
-		self.node_degree_by_community = node_degree_by_community
-		self.matrix = np.array(self.community.graph.get_adjacency(attribute='weight').data)
-
-
-def matrix_to_igraph(matrix,cost,binary=False,check_tri=True,interpolation='midpoint',normalize=False,mst=False,test_matrix=True):
-	"""
-	Convert a matrix to an igraph object
-	matrix: a numpy matrix
-	cost: the proportion of edges. e.g., a cost of 0.1 has 10 percent
-	of all possible edges in the graph
-	binary: False, convert weighted values to 1
-	check_tri: True, ensure that the matrix contains upper and low triangles.
-	if it does not, the cost calculation changes.
-	interpolation: midpoint, the interpolation method to pass to np.percentile
-	normalize: False, make all edges sum to 1. Convienient for comparisons across subjects,
-	as this ensures the same sum of weights and number of edges are equal across subjects
-	mst: False, calculate the maximum spanning tree, which is the strongest set of edges that
-	keep the graph connected. This is convienient for ensuring no nodes become disconnected.
-	"""
-	matrix = np.array(matrix)
-	matrix = threshold(matrix,cost,binary,check_tri,interpolation,normalize,mst)
-	g = Graph.Weighted_Adjacency(matrix.tolist(),mode=ADJ_UNDIRECTED,attr="weight")
-	print 'Matrix converted to graph with density of: ' + str(g.density())
-	if np.diff([cost,g.density()])[0] > .005:
-		print 'Density not %s! Did you want: ' %(cost)+ str(g.density()) + ' ?' 
-	return g
 		
 
 def cal_dynamic_graph(MTD):
@@ -161,12 +86,14 @@ def cal_dynamic_graph(MTD):
 	WW = np.zeros([MTD.shape[1],MTD.shape[0]])
 	BW = np.zeros([MTD.shape[1],MTD.shape[0]])
 	
-	for i, t in enumerate(range(0,time_points+1)):
-		matrix = MTD[t,:,:]
+	for i, t in enumerate(range(0,time_points)):
+		matrix = MTD[i,:,:]
 		#modularity
 		ci[:,i], q[i] = bct.modularity_louvain_und_sign(matrix)
 		#PC
-		PC[:,i] = bct.participation_coef_sign(matrix, ci[:,i])
+		# for now, no negative weights
+		matrix[matrix<0] = 0
+		PC[:,i] = participation_coef(matrix, ci[:,i])
 		#WMD
 		WMD[:,i] = bct.module_degree_zscore(matrix, ci[:,i])
 		## within weight
@@ -176,68 +103,6 @@ def cal_dynamic_graph(MTD):
 
 	return ci, q, PC, WMD, WW, BW	
 
-def matrix_to_igraph(matrix,cost,binary=False,check_tri=True,interpolation='midpoint',normalize=False,mst=False,test_matrix=True):
-	"""
-	Convert a matrix to an igraph object
-	matrix: a numpy matrix
-	cost: the proportion of edges. e.g., a cost of 0.1 has 10 percent
-	of all possible edges in the graph
-	binary: False, convert weighted values to 1
-	check_tri: True, ensure that the matrix contains upper and low triangles.
-	if it does not, the cost calculation changes.
-	interpolation: midpoint, the interpolation method to pass to np.percentile
-	normalize: False, make all edges sum to 1. Convienient for comparisons across subjects,
-	as this ensures the same sum of weights and number of edges are equal across subjects
-	mst: False, calculate the maximum spanning tree, which is the strongest set of edges that
-	keep the graph connected. This is convienient for ensuring no nodes become disconnected.
-	"""
-	matrix = np.array(matrix)
-	matrix = threshold(matrix,cost,binary,check_tri,interpolation,normalize,mst)
-	g = Graph.Weighted_Adjacency(matrix.tolist(),mode=ADJ_UNDIRECTED,attr="weight")
-	print 'Matrix converted to graph with density of: ' + str(g.density())
-	if np.diff([cost,g.density()])[0] > .005:
-		print 'Density not %s! Did you want: ' %(cost)+ str(g.density()) + ' ?' 
-	return g
-
-
-# def participation_coef(W, ci, degree='undirected'):
-#     '''
-#     Participation coefficient is a measure of diversity of intermodular
-#     connections of individual nodes.
-#     Parameters
-#     ----------
-#     W : NxN np.ndarray
-#         binary/weighted directed/undirected connection matrix
-#     ci : Nx1 np.ndarray
-#         community affiliation vector
-#     degree : str
-#         Flag to describe nature of graph 'undirected': For undirected graphs
-#                                          'in': Uses the in-degree
-#                                          'out': Uses the out-degree
-#     Returns
-#     -------
-#     P : Nx1 np.ndarray
-#         participation coefficient
-#     '''
-#     if degree == 'in':
-#         W = W.T
-
-#     _, ci = np.unique(ci, return_inverse=True)
-#     ci += 1
-
-#     n = len(W)  # number of vertices
-#     Ko = np.sum(W, axis=1)  # (out) degree
-#     Gc = np.dot((W != 0), np.diag(ci))  # neighbor community affiliation
-#     Kc2 = np.zeros((n,))  # community-specific neighbors
-
-#     for i in range(1, int(np.max(ci)) + 1):
-#         Kc2 += np.square(np.sum(W * (Gc == i), axis=1))
-
-#     P = np.ones((n,)) - Kc2 / np.square(Ko)
-#     # P=0 if for nodes with no (out) neighbors
-#     P[np.where(np.logical_not(Ko))] = 0
-
-#     return P
 
 def cal_within_weight(matrix, ci):
 	'''within module connectivity weight'''
@@ -258,6 +123,122 @@ def cal_between_weight(matrix, ci):
 		BW[np.where(ci == i)] = Koi
 	return BW
 
+# class brain_graph:
+# 	def __init__(self, VC):
+# 		assert (np.unique(VC.membership) == range(len(VC.sizes()))).all()
+# 		node_degree_by_community = np.zeros((VC.graph.vcount(),len(VC.sizes())),dtype=np.float64)
+# 		for node1 in range(VC.graph.vcount()):
+# 			for comm_idx in (np.unique(VC.membership)):
+# 				comm_total_degree = 0.
+# 				for node2 in np.argwhere(np.array(VC.membership)==comm_idx).reshape(-1):
+# 					eid = VC.graph.get_eid(node1,node2,error=False)
+# 					if eid == - 1:
+# 						continue
+# 					weight = VC.graph.es[eid]["weight"]
+# 					comm_total_degree = comm_total_degree + weight
+# 				node_degree_by_community[node1,comm_idx] = comm_total_degree
+# 		pc_array = np.zeros(VC.graph.vcount())
+# 		for node in range(VC.graph.vcount()):
+# 		    assert np.isclose(VC.graph.strength(node,weights='weight'),np.nansum(node_degree_by_community[node]))
+# 		    # node_degree = np.nansum(node_degree_by_community[node])
+# 		    node_degree = VC.graph.strength(node,weights='weight')
+# 		    if node_degree == 0.0: 
+# 		        pc_array[node]= np.nan
+# 		        continue    
+# 		    pc = 0.0
+# 		    for idx,comm_degree in enumerate(node_degree_by_community[node]):
+# 		        pc = pc + ((float(comm_degree)/float(node_degree))**2)
+# 		    pc = 1.0 - pc
+# 		    pc_array[int(node)] = float(pc)
+# 		self.pc = pc_array
+# 		wmd_array = np.zeros(VC.graph.vcount())
+# 		for comm_idx in range(len(VC.sizes())):
+# 			comm = np.argwhere(np.array(VC.membership)==comm_idx).reshape(-1)
+# 			comm_std = np.std(node_degree_by_community[comm,comm_idx],dtype=np.float64)
+# 			comm_mean = np.mean(node_degree_by_community[comm,comm_idx],dtype=np.float64)
+# 			for node in comm:
+# 				# node_degree = np.nansum(node_degree_by_community[node])
+# 				node_degree = VC.graph.strength(node,weights='weight')
+# 				comm_node_degree = node_degree_by_community[node,comm_idx]
+# 				if node_degree == 0.0:
+# 					wmd_array[node] = np.nan
+# 					continue
+# 				if comm_std == 0.0:
+# 					assert comm_node_degree == comm_mean
+# 					wmd_array[node] = 0.0
+# 					continue
+# 				wmd_array[node] = np.divide((np.subtract(comm_node_degree,comm_mean)),comm_std)
+# 		self.wmd = wmd_array
+# 		self.community = VC
+# 		self.node_degree_by_community = node_degree_by_community
+# 		self.matrix = np.array(self.community.graph.get_adjacency(attribute='weight').data)
 
-subject, sequence, roi = raw_input().split()
-function_cal_pcorr_mat(subject, sequence, roi)
+
+# def matrix_to_igraph(matrix,cost,binary=False,check_tri=True,interpolation='midpoint',normalize=False,mst=False,test_matrix=True):
+# 	"""
+# 	Convert a matrix to an igraph object
+# 	matrix: a numpy matrix
+# 	cost: the proportion of edges. e.g., a cost of 0.1 has 10 percent
+# 	of all possible edges in the graph
+# 	binary: False, convert weighted values to 1
+# 	check_tri: True, ensure that the matrix contains upper and low triangles.
+# 	if it does not, the cost calculation changes.
+# 	interpolation: midpoint, the interpolation method to pass to np.percentile
+# 	normalize: False, make all edges sum to 1. Convienient for comparisons across subjects,
+# 	as this ensures the same sum of weights and number of edges are equal across subjects
+# 	mst: False, calculate the maximum spanning tree, which is the strongest set of edges that
+# 	keep the graph connected. This is convienient for ensuring no nodes become disconnected.
+# 	"""
+# 	matrix = np.array(matrix)
+# 	matrix = threshold(matrix,cost,binary,check_tri,interpolation,normalize,mst)
+# 	g = Graph.Weighted_Adjacency(matrix.tolist(),mode=ADJ_UNDIRECTED,attr="weight")
+# 	print 'Matrix converted to graph with density of: ' + str(g.density())
+# 	if np.diff([cost,g.density()])[0] > .005:
+# 		print 'Density not %s! Did you want: ' %(cost)+ str(g.density()) + ' ?' 
+# 	return g
+
+
+# def matrix_to_igraph(matrix,cost,binary=False,check_tri=True,interpolation='midpoint',normalize=False,mst=False,test_matrix=True):
+# 	"""
+# 	Convert a matrix to an igraph object
+# 	matrix: a numpy matrix
+# 	cost: the proportion of edges. e.g., a cost of 0.1 has 10 percent
+# 	of all possible edges in the graph
+# 	binary: False, convert weighted values to 1
+# 	check_tri: True, ensure that the matrix contains upper and low triangles.
+# 	if it does not, the cost calculation changes.
+# 	interpolation: midpoint, the interpolation method to pass to np.percentile
+# 	normalize: False, make all edges sum to 1. Convienient for comparisons across subjects,
+# 	as this ensures the same sum of weights and number of edges are equal across subjects
+# 	mst: False, calculate the maximum spanning tree, which is the strongest set of edges that
+# 	keep the graph connected. This is convienient for ensuring no nodes become disconnected.
+# 	"""
+# 	matrix = np.array(matrix)
+# 	matrix = threshold(matrix,cost,binary,check_tri,interpolation,normalize,mst)
+# 	g = Graph.Weighted_Adjacency(matrix.tolist(),mode=ADJ_UNDIRECTED,attr="weight")
+# 	print 'Matrix converted to graph with density of: ' + str(g.density())
+# 	if np.diff([cost,g.density()])[0] > .005:
+# 		print 'Density not %s! Did you want: ' %(cost)+ str(g.density()) + ' ?' 
+# 	return g
+
+subject, sequence, roi, w = raw_input().split()
+MTD = cal_MTD(subject , sequence, roi, w)
+ci, q, PC, WMD, WW, BW = cal_dynamic_graph(MTD)
+
+fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_ci' %(subject,sequence,roi,w)
+np.save(fn, ci)
+
+fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_q' %(subject,sequence,roi,w)
+np.save(fn, q)
+
+fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_PC' %(subject,sequence,roi,w)
+np.save(fn, PC)
+
+fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_WMD' %(subject,sequence,roi,w)
+np.save(fn, WMD)
+
+fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_WW' %(subject,sequence,roi,w)
+np.save(fn, WW)
+
+fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_BW' %(subject,sequence,roi,w)
+np.save(fn, BW)
