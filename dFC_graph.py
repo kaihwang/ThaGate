@@ -69,7 +69,7 @@ def cal_MTD(subject , sequence, roi, w):
 	pcorr_path = '/home/despoB/kaihwang/Rest/ThaGate/Matrices/'
 	fn = ts_path + subject + '_%s_%s_000.netts' %(roi, sequence)
 	ts = np.loadtxt(fn)
-
+	ts = ts.T
 	_, MTD = coupling(ts, w) #the smoothing window is set to 14 for HCP, for NKI 645 15
 
 	return MTD #the dimension of MTD is time by ROI by ROI
@@ -93,7 +93,7 @@ def cal_dynamic_graph(MTD):
 		#PC
 		# for now, no negative weights
 		matrix[matrix<0] = 0
-		PC[:,i] = participation_coef(matrix, ci[:,i])
+		PC[:,i] = bct.participation_coef(matrix, ci[:,i])
 		#WMD
 		WMD[:,i] = bct.module_degree_zscore(matrix, ci[:,i])
 		## within weight
