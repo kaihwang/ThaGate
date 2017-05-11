@@ -26,7 +26,7 @@ Follow up on graph analysis of thalamocortical connectivity.
 
 #10 Po
 
-#11 PLGN
+#11 LGN
 
 #12 PuM
 
