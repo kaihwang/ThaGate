@@ -8,23 +8,25 @@ import statsmodels.api as sm
 
 def map_target():
 	'''use NKI dataset to find cortical targets(Yeo17 or Yeo400) for each thalamic nuclei'''
-	# average matrices then find max
-	Morel_Yeo17_M = average_corrmat('/home/despoB/connectome-thalamus/ThaGate/Matrices/NKI*_Morel_plus_Yeo17_645_corrmat', np_txt=True, pickle_object=False)
-	np.fill_diagonal(Morel_Yeo17_M, 0)
-	MaxYeo17_Morel = np.argmax(Morel_Yeo17_M[17:,0:17],1)+1
+	
+	# # average matrices then find max YeoNetwork
+	# Morel_Yeo17_M = average_corrmat('/home/despoB/connectome-thalamus/ThaGate/Matrices/NKI*_Morel_plus_Yeo17_645_corrmat', np_txt=True, pickle_object=False)
+	# np.fill_diagonal(Morel_Yeo17_M, 0)
+	# MaxYeo17_Morel = np.argmax(Morel_Yeo17_M[17:,0:17],1)+1
 
-
-	Morel_Yeo17_pM = average_corrmat('/home/despoB/connectome-thalamus/ThaGate/Matrices/NKI*_Morel_plus_Yeo17_645_partial_corrmat', np_txt=True, pickle_object=False)
-	np.fill_diagonal(Morel_Yeo17_pM, 0)
-	MaxYeo17_Morel_pM = np.argmax(Morel_Yeo17_pM[17:,0:17],1)+1
+	# # average matrices then find max YeoNetwork using partial correlation
+	# Morel_Yeo17_pM = average_corrmat('/home/despoB/connectome-thalamus/ThaGate/Matrices/NKI*_Morel_plus_Yeo17_645_partial_corrmat', np_txt=True, pickle_object=False)
+	# np.fill_diagonal(Morel_Yeo17_pM, 0)
+	# MaxYeo17_Morel_pM = np.argmax(Morel_Yeo17_pM[17:,0:17],1)+1
 
 
 	Morel_Yeo400_M = average_corrmat('/home/despoB/connectome-thalamus/ThaGate/Matrices/NKI*_Morel_plus_Yeo400_645_corrmat', np_txt=True, pickle_object=False)
 	np.fill_diagonal(Morel_Yeo400_M, 0)
 	Morel_Yeo400_M[np.isnan(Morel_Yeo400_M)] = 0
-	MaxYeo400_Morel = np.argmax(Morel_Yeo400_M[400:,0:400],1)+1
-
-	return MaxYeo17_Morel, MaxYeo17_Morel_pM, MaxYeo400_Morel
+	M = Morel_Yeo400_M[400:,0:400]
+	MaxYeo400_Morel = np.argsort(M,1)[:,-1:-6:-1] #np.argmax(Morel_Yeo400_M[400:,0:400],1)+1 #max connections at the end
+	MinYeo400_Morel = np.argsort(M,1)[:,0:5]
+	return MaxYeo400_Morel, MinYeo400_Morel
 
 
 
@@ -54,29 +56,14 @@ def fit_linear_model(y,x):
 	est = sm.OLS(Y, X).fit() #OLS fit
 	return est 
 
-if __name__ == "__main__":
 
-	#get targets
-	#MaxYeo17_Morel, MaxYeo17_Morel_pM, MaxYeo400_Morel = map_target()
-
-	#get list of NKI subjects
-	with open("/home/despoB/kaihwang/bin/ThaGate/NKI_subjlist") as f:
-		Subjects = [line.rstrip() for line in f]
-
-	#global variables
-	#for now use TR645	
-	seq = 645
-	window = 16	
-	Nuclei = ['AN','VM', 'VL', 'MGN', 'MD', 'PuA', 'LP', 'IL', 'VA', 'Po', 'LGN', 'PuM', 'PuI', 'PuL', 'VP']
-	measures = ['PC', 'WMD', 'WW', 'BW', 'q']
+def run_regmodel(Subjects, seq, window, measures, nodeselection = np.nan):
+	''' wraper script to test thalamic acitivty's effect on global network properties'''
 	
-	#### test thalamic correlations with these global topological measures: ['PC', 'WMD', 'WW', 'BW', 'q']
-	#output dataframe
 	df = pd.DataFrame(columns=('Subject', 'Thalamic Nuclei', 'PC', 'WMD', 'WW', 'BW', 'q')) 
-	 
+ 	Nuclei = ['AN','VM', 'VL', 'MGN', 'MD', 'PuA', 'LP', 'IL', 'VA', 'Po', 'LGN', 'PuM', 'PuI', 'PuL', 'VP']
 	#loop through subjects
 	for i, subj in enumerate(Subjects):
-		
 		#create subject dataframe
 		sdf = pd.DataFrame(columns=('Subject', 'Thalamic Nuclei', 'PC', 'WMD', 'WW', 'BW', 'q')) 
 		sdf['Thalamic Nuclei'] = Nuclei
@@ -84,24 +71,52 @@ if __name__ == "__main__":
 
 		for measure in measures:
 			y = load_graph_metric(subj, seq, window, measure)
-			if y.ndim > 1:
-				#if dimension more than 1, average across nodes (global prooperty)
-				y = np.mean(load_graph_metric(subj, seq, window, measure), axis=0)
+
+			if np.isnan(nodeselection).all(): #set it to nan for cal global metrics
+				if y.ndim > 1:
+					#if dimension more than 1, average across nodes (global prooperty)
+					y = np.mean(y, axis=0)
+
 			x = tha_morel_ts(subj, seq, window)	
 
 			#fit one var at a time because of potential co-linearity between nuclei
 			for j in np.arange(x.shape[1]):
+				if np.alltrue(~np.isnan(nodeselection)):
+					if y.ndim > 1:
+						y = np.mean(y[nodeselection[j,:],:],axis=0) #use nodeselection vector to select cortical nodes and average nodal metrics
+				
 				est = fit_linear_model(y,x[:,j])
 				sdf[measure].loc[sdf['Thalamic Nuclei'] == Nuclei[j]] = est.tvalues[1]
 
 		df=pd.concat([df, sdf])
+	
+	return df
 
-	#plot results
+if __name__ == "__main__":
+
+
+	#get list of NKI subjects
+	with open("/home/despoB/kaihwang/bin/ThaGate/NKI_subjlist") as f:
+		Subjects = [line.rstrip() for line in f]
+
+	##global variables
+	#for now use TR645	
+	seq = 645
+	window = 16	
+	measures = ['PC', 'WMD', 'WW', 'BW', 'q']
+	
+	#### test thalamic correlations with these global topological measures: ['PC', 'WMD', 'WW', 'BW', 'q']
+	#df = run_regmodel(Subjects, seq, window, measures)
+	
+
+	#### test nodal variables
+	#get targets
+	#MaxYeo17_Morel, MaxYeo17_Morel_pM, MaxYeo400_Morel = map_target()
+	MaxYeo400_Morel, MinYeo400_Morel = map_target()
+	Target_Node_df = run_regmodel(Subjects, seq, window, measures, MaxYeo400_Morel)
+	NonTarget_Node_df = run_regmodel(Subjects, seq, window, measures, MinYeo400_Morel)
+
+	### #plot results
 	for measure in measures:
-		sns.factorplot(x='Thalamic Nuclei', y=measure, data=df, kind='bar')	
-
-
-
-
-
+		sns.factorplot(x='Thalamic Nuclei', y=measure, data=NonTarget_Node_df, kind='bar')	
 
