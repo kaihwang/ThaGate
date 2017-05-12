@@ -151,7 +151,7 @@ def run_d_graph():
 
 if __name__ == "__main__":
 
-#run_d_graph()
+	run_d_graph()
 
 
 
