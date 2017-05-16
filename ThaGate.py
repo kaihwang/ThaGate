@@ -151,9 +151,22 @@ if __name__ == "__main__":
 
 	### #plot results
 	for measure in measures:
-		plt.figure()
+		#plt.figure()
 		sns.factorplot(x='Thalamic Nuclei', y=measure, data=NonTarget_MTD_Node_df, kind='bar')	
 
 	#get a sense of the overal distribution of thalamocortical weights	
-	plt.figure()
+	#plt.figure()
 	sns.distplot(Morel_Yeo400_M[~np.isnan(Morel_Yeo400_M)])
+
+	#save outputs
+	Global_df.to_csv('Data/Global_df.csv')
+	Target_Node_df.to_csv('Data/Target_Node_df.csv')
+	Target_MTD_Node_df.to_csv('Data/Target_MTD_Node_df.csv')
+	NonTarget_Node_df.to_csv('Data/NonTarget_Node_df.csv')
+	NonTarget_MTD_Node_df.to_csv('Data/NonTarget_MTD_Node_df.csv')
+
+	np.save('Data/MaxYeo400_Morel', MaxYeo400_Morel)
+	np.save('Data/MinYeo400_Morel', MinYeo400_Morel)
+	np.save('Data/Morel_Yeo400_M', Morel_Yeo400_M)
+
+
