@@ -35,6 +35,10 @@ def load_graph_metric(subj, seq, window, measure):
 	'''shorthand to load graph metric'''
 	fn = '/home/despoB/connectome-thalamus/ThaGate/Graph/' + subj + '_' + str(seq) + '_' +'Morel_plus_Yeo400' + '_w' + str(window) + '_' + measure + '.npy'
 	y = np.load(fn)
+
+	if measure == 'phis':  #maxwell's calculation on club coeff transposed matrices
+		y = y.T 		   #the dimension should be ROI by time
+
 	return y
 
 
@@ -59,6 +63,8 @@ def fit_linear_model(y,x):
 	#need to take out nans first
 	Y = y[~np.isnan(y)]
 	X = x[~np.isnan(y)]
+	Y = y[~np.isnan(x)]
+	X = x[~np.isnan(x)]
 
 	#add constant
 	X = sm.add_constant(X)   
@@ -68,15 +74,16 @@ def fit_linear_model(y,x):
 
 def run_regmodel(Subjects, seq, window, measures, nodeselection = np.nan, MTD = False):
 	''' wraper script to test thalamic acitivty's effect on global network properties
-	if calculating global metrics (eg, q, avePC), then set nodeselection = np.nan
+	if calculating global metrics (eg, q, avePC), then set nodeselection = np.nan. 
 	if using MTD between neuclei and cortical targets as predictors, set MTD = True'''
 	
-	df = pd.DataFrame(columns=('Subject', 'Thalamic Nuclei', 'PC', 'WMD', 'WW', 'BW', 'q')) 
+	df = pd.DataFrame(columns=('Subject', 'Thalamic Nuclei', 'PC', 'WMD', 'WW', 'BW', 'q', 'phis')) 
  	Nuclei = ['AN','VM', 'VL', 'MGN', 'MD', 'PuA', 'LP', 'IL', 'VA', 'Po', 'LGN', 'PuM', 'PuI', 'PuL', 'VP']
+	
 	#loop through subjects
 	for i, subj in enumerate(Subjects):
 		#create subject dataframe
-		sdf = pd.DataFrame(columns=('Subject', 'Thalamic Nuclei', 'PC', 'WMD', 'WW', 'BW', 'q')) 
+		sdf = pd.DataFrame(columns=('Subject', 'Thalamic Nuclei', 'PC', 'WMD', 'WW', 'BW', 'q', 'phis')) 
 		sdf['Thalamic Nuclei'] = Nuclei
 		sdf['Subject'] = subj
 
@@ -87,7 +94,7 @@ def run_regmodel(Subjects, seq, window, measures, nodeselection = np.nan, MTD = 
 			if np.isnan(nodeselection).all(): 
 				if y.ndim > 1: # for q then no averaging 
 					#if dimension more than 1, average across nodes (global prooperty)
-					y = np.mean(y, axis=0)
+					y = np.nanmean(y, axis=0)
 
 			#if not doing coupling, then use thalamic ts		
 			if MTD == False: 		
@@ -119,7 +126,7 @@ def run_regmodel(Subjects, seq, window, measures, nodeselection = np.nan, MTD = 
 
 				sdf[measure].loc[sdf['Thalamic Nuclei'] == Nuclei[j]] = est.tvalues[1]
 
-		df=pd.concat([df, sdf])
+		df = pd.concat([df, sdf])
 	
 	return df
 
@@ -134,29 +141,20 @@ if __name__ == "__main__":
 	#for now use TR645	
 	seq = 645
 	window = 16	
-	measures = ['PC', 'WMD', 'WW', 'BW', 'q']
+	measures = ['PC', 'WMD', 'WW', 'BW', 'q', 'phis']
 	
-	#### test thalamic correlations with these global topological measures: ['PC', 'WMD', 'WW', 'BW', 'q']
+	#### test thalamic correlations with these global topological measures: ['PC', 'WMD', 'WW', 'BW', 'q', 'phis']
 	Global_df = run_regmodel(Subjects, seq, window, measures)
 
 	#### test nodal variables
 	#get targets
-	#MaxYeo17_Morel, MaxYeo17_Morel_pM, MaxYeo400_Morel = map_target()
+	MaxYeo17_Morel, MaxYeo17_Morel_pM, MaxYeo400_Morel = map_target()
 	MaxYeo400_Morel, MinYeo400_Morel, Morel_Yeo400_M = map_target()
 	Target_Node_df = run_regmodel(Subjects, seq, window, measures, MaxYeo400_Morel)
 	Target_MTD_Node_df = run_regmodel(Subjects, seq, window, measures, MaxYeo400_Morel, MTD = True)
 	NonTarget_Node_df = run_regmodel(Subjects, seq, window, measures, MinYeo400_Morel)
 	NonTarget_MTD_Node_df = run_regmodel(Subjects, seq, window, measures, MinYeo400_Morel, MTD = True)
 
-
-	### #plot results
-	for measure in measures:
-		#plt.figure()
-		sns.factorplot(x='Thalamic Nuclei', y=measure, data=NonTarget_MTD_Node_df, kind='bar')	
-
-	#get a sense of the overal distribution of thalamocortical weights	
-	#plt.figure()
-	sns.distplot(Morel_Yeo400_M[~np.isnan(Morel_Yeo400_M)])
 
 	#save outputs
 	Global_df.to_csv('Data/Global_df.csv')
@@ -168,5 +166,16 @@ if __name__ == "__main__":
 	np.save('Data/MaxYeo400_Morel', MaxYeo400_Morel)
 	np.save('Data/MinYeo400_Morel', MinYeo400_Morel)
 	np.save('Data/Morel_Yeo400_M', Morel_Yeo400_M)
+
+	### #plot results
+	# get a sense of the overal distribution of thalamocortical weights	
+	plt.figure()
+	sns.distplot(Morel_Yeo400_M[~np.isnan(Morel_Yeo400_M)])
+
+	
+	for measure in measures:
+		#plt.figure()
+		sns.factorplot(x='Thalamic Nuclei', y=measure, data=Global_df, kind='bar')	
+		plt.show()
 
 
