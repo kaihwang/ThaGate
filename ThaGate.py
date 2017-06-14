@@ -6,6 +6,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
 from dFC_graph import coupling
+from matplotlib import colors
 
 def map_target():
 	'''use NKI dataset to find cortical targets(Yeo17 or Yeo400) for each thalamic nuclei'''
@@ -21,7 +22,7 @@ def map_target():
 	# MaxYeo17_Morel_pM = np.argmax(Morel_Yeo17_pM[17:,0:17],1)+1
 
 
-	Morel_Yeo400_M = average_corrmat('/home/despoB/connectome-thalamus/ThaGate/Matrices/NKI*_Morel_plus_Yeo400_645_corrmat', np_txt=True, pickle_object=False)
+	Morel_Yeo400_M = average_corrmat('/home/despoB/connectome-thalamus/ThaGate/Matrices/NKI*_Morel_plus_Yeo400_1400_corrmat', np_txt=True, pickle_object=False)
 	np.fill_diagonal(Morel_Yeo400_M, 0)
 	Morel_Yeo400_M[np.isnan(Morel_Yeo400_M)] = 0
 	M = Morel_Yeo400_M[400:,0:400]
@@ -130,6 +131,74 @@ def run_regmodel(Subjects, seq, window, measures, nodeselection = np.nan, MTD = 
 	
 	return df
 
+def YeoNetwork_parcellation():
+	''' parcelate thalamus using Yeo17 networks'''
+	# average matrices
+	M = average_corrmat('/home/despoB/kaihwang/Rest/ThaGate/Matrices/*thavox_plus_Yeo17_645*', np_txt=True, pickle_object=False)
+
+	subcortical_voxels = np.loadtxt('/home/despoB/connectome-thalamus/ROIs/thalamus_voxel_indices')
+	cortical_ROIs = np.arange(1,15)
+	subcorticalcortical_ROIs = np.append(cortical_ROIs, subcortical_voxels)
+	_, ParcelCIs, _, = parcel_subcortical_network(M, subcorticalcortical_ROIs, subcortical_voxels, cortical_ROIs, cortical_ROIs)
+
+	#create a mask based on the morel atlas 
+	Morel_atlas = np.loadtxt('/home/despoB/connectome-thalamus/Thalamic_parcel/Morel_parcel')
+	Morel_mask = np.loadtxt('/home/despoB/connectome-thalamus/Thalamic_parcel/morel_mask')
+	mask_value = Morel_mask==0
+
+	CIs = sort_CI(ParcelCIs)
+
+	return CIs
+
+def sort_CI(Thalamo_ParcelCIs):
+    CIs = np.zeros(len(Thalamus_voxel_coordinate))
+    for i, thalamus_voxel_index in enumerate(Thalamus_voxel_coordinate[:,3]):
+        CIs[i] = Thalamo_ParcelCIs[thalamus_voxel_index][0]
+    CIs = CIs.astype(int)
+    return CIs
+
+def visualize_parcellation(CIs, cmap):
+    # show volum image
+    MNI_img = nib.load('/home/despoB/connectome-thalamus/ROIs/MNI152_T1_2mm_brain.nii.gz')
+    MNI_data = MNI_img.get_data()
+    Thalamus_voxel_coordinate = np.loadtxt('/home/despoB/connectome-thalamus/ROIs/thalamus_voxels_ijk_indices', dtype = int)
+
+    # create mask for parcel
+    Mask = np.zeros(MNI_data.shape)
+
+
+    # assign CI to each subcortical voxel
+    for i, CI in enumerate(CIs):
+        Mask[Thalamus_voxel_coordinate[i,0], Thalamus_voxel_coordinate[i,1], Thalamus_voxel_coordinate[i,2]] = CIs[i].astype(int)
+    Mask = np.ma.masked_where(Mask == 0, Mask)
+
+    # flip dimension to show anteiror of the brain at top
+    MNI_data = MNI_data.swapaxes(0,1)
+    Mask = Mask.swapaxes(0,1)
+
+    # some plot setting (colormap), interplotation..
+    #cmap = colors.ListedColormap(['red', 'blue', 'cyan', 'yellow', 'teal', 'purple', 'pink', 'green', 'black'])
+    #cmap = colors.ListedColormap(['blue', 'red', 'cyan', 'yellow', 'green'])
+    # display slice by slice
+    Z_slices = range(np.min(Thalamus_voxel_coordinate[:,2])+2, np.max(Thalamus_voxel_coordinate[:,2])-1,2)
+    fig = plt.figure()
+    for i, Z_slice in enumerate(Z_slices):
+        #if i <4:
+        a = plt.subplot(1, len(Z_slices), i+1 )
+        #else:
+        #    a = plt.subplot(2, len(Z_slices)/2, i+1-4 )
+        a.set_yticks([])
+        a.set_xticks([])
+        plt.imshow(MNI_data[45:65, 30:60, Z_slice], cmap='gray', interpolation='nearest')
+        plt.imshow(Mask[45:65, 30:60, Z_slice],cmap=cmap, interpolation='none', vmin = 1, vmax=np.max(CIs))
+        plt.ylim(plt.ylim()[::-1])
+        
+    fig.tight_layout() 
+    fig.set_size_inches(6.45, 0.7) 
+    
+   # plt.savefig(savepath, bbox_inches='tight')
+
+
 if __name__ == "__main__":
 
 
@@ -139,16 +208,16 @@ if __name__ == "__main__":
 
 	##global variables
 	#for now use TR645	
-	seq = 645
-	window = 16	
-	measures = ['PC', 'WMD', 'WW', 'BW', 'q', 'phis']
+	seq = 1400
+	window = 11	
+	measures = ['PC', 'WMD', 'WW', 'BW', 'q']
 	
 	#### test thalamic correlations with these global topological measures: ['PC', 'WMD', 'WW', 'BW', 'q', 'phis']
 	Global_df = run_regmodel(Subjects, seq, window, measures)
 
 	#### test nodal variables
 	#get targets
-	MaxYeo17_Morel, MaxYeo17_Morel_pM, MaxYeo400_Morel = map_target()
+	#MaxYeo17_Morel, MaxYeo17_Morel_pM, MaxYeo400_Morel = map_target()
 	MaxYeo400_Morel, MinYeo400_Morel, Morel_Yeo400_M = map_target()
 	Target_Node_df = run_regmodel(Subjects, seq, window, measures, MaxYeo400_Morel)
 	Target_MTD_Node_df = run_regmodel(Subjects, seq, window, measures, MaxYeo400_Morel, MTD = True)
@@ -175,7 +244,7 @@ if __name__ == "__main__":
 	
 	for measure in measures:
 		#plt.figure()
-		sns.factorplot(x='Thalamic Nuclei', y=measure, data=Global_df, kind='bar')	
+		sns.factorplot(x='Thalamic Nuclei', y=measure, data=Target_MTD_Node_df, kind='bar')	
 		plt.show()
 
 
