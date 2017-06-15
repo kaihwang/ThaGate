@@ -30,6 +30,16 @@ def map_target():
 	MinYeo400_Morel = np.argsort(M,1)[:,0:5]
 	return MaxYeo400_Morel, MinYeo400_Morel, Morel_Yeo400_M
 
+def map_indiv_target(subj, seq):
+	''' feed in individual matrix and find cortical targets for each thalamic nuclei'''
+	fn = '/home/despoB/connectome-thalamus/ThaGate/Matrices/NKI_%s_Morel_plus_Yeo400_%s_corrmat' %(subj, seq)
+	M = np.loadtxt(fn)
+	np.fill_diagonal(M, 0)
+	M[np.isnan(M)] = 0
+	Cortical_M = M[400:,0:400]
+	Max = np.argsort(Cortical_M,1)[:,-1:-6:-1] 
+	Min = np.argsort(Cortical_M,1)[:,0:5]
+	return Max, Min
 
 
 def load_graph_metric(subj, seq, window, measure):
@@ -73,7 +83,7 @@ def fit_linear_model(y,x):
 	return est 
 
 
-def run_regmodel(Subjects, seq, window, measures, nodeselection = np.nan, MTD = False):
+def run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = False, nodeselection = np.nan):
 	''' wraper script to test thalamic acitivty's effect on global network properties
 	if calculating global metrics (eg, q, avePC), then set nodeselection = np.nan. 
 	if using MTD between neuclei and cortical targets as predictors, set MTD = True'''
@@ -104,6 +114,10 @@ def run_regmodel(Subjects, seq, window, measures, nodeselection = np.nan, MTD = 
 			#if doing coupling, then extract thalamic and cortical ts and do MTD coupling calculation later	
 			if MTD == True:
 				ts = tha_morel_plus_cortical_ts(subj, seq, window)	
+
+			# if using individual matrices to find cortical targets	
+			if IndivTarget:
+				nodeselection, _ = map_indiv_target(subj, seq)	
 				
 			#fit one var at a time because of potential co-linearity between nuclei
 			for j in np.arange(len(Nuclei)):
@@ -195,7 +209,6 @@ def visualize_parcellation(CIs, cmap):
         
     fig.tight_layout() 
     fig.set_size_inches(6.45, 0.7) 
-    
    # plt.savefig(savepath, bbox_inches='tight')
 
 
@@ -208,9 +221,9 @@ if __name__ == "__main__":
 
 	##global variables
 	#for now use TR645	
-	seq = 1400
-	window = 11	
-	measures = ['PC', 'WMD', 'WW', 'BW', 'q']
+	seq = 645
+	window = 16	
+	measures = ['PC', 'WMD', 'WW', 'BW', 'q', 'phis']
 	
 	#### test thalamic correlations with these global topological measures: ['PC', 'WMD', 'WW', 'BW', 'q', 'phis']
 	Global_df = run_regmodel(Subjects, seq, window, measures)
@@ -219,32 +232,34 @@ if __name__ == "__main__":
 	#get targets
 	#MaxYeo17_Morel, MaxYeo17_Morel_pM, MaxYeo400_Morel = map_target()
 	MaxYeo400_Morel, MinYeo400_Morel, Morel_Yeo400_M = map_target()
-	Target_Node_df = run_regmodel(Subjects, seq, window, measures, MaxYeo400_Morel)
-	Target_MTD_Node_df = run_regmodel(Subjects, seq, window, measures, MaxYeo400_Morel, MTD = True)
-	NonTarget_Node_df = run_regmodel(Subjects, seq, window, measures, MinYeo400_Morel)
-	NonTarget_MTD_Node_df = run_regmodel(Subjects, seq, window, measures, MinYeo400_Morel, MTD = True)
+	#Target_Node_df = run_regmodel(Subjects, seq, window, measures, MaxYeo400_Morel)
+	#Target_MTD_Node_df = run_regmodel(Subjects, seq, window, measures, MaxYeo400_Morel, MTD = True)
+	#NonTarget_Node_df = run_regmodel(Subjects, seq, window, measures, MinYeo400_Morel)
+	#NonTarget_MTD_Node_df = run_regmodel(Subjects, seq, window, measures, MinYeo400_Morel, MTD = True)
+	IndivTarget_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = True)
+	IndivTarget_MTD_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = True, MTD = True)
 
 
 	#save outputs
-	Global_df.to_csv('Data/Global_df.csv')
-	Target_Node_df.to_csv('Data/Target_Node_df.csv')
-	Target_MTD_Node_df.to_csv('Data/Target_MTD_Node_df.csv')
-	NonTarget_Node_df.to_csv('Data/NonTarget_Node_df.csv')
-	NonTarget_MTD_Node_df.to_csv('Data/NonTarget_MTD_Node_df.csv')
+	#Global_df.to_csv('Data/Global_df.csv')
+	#Target_Node_df.to_csv('Data/Target_Node_df.csv')
+	#Target_MTD_Node_df.to_csv('Data/Target_MTD_Node_df.csv')
+	#NonTarget_Node_df.to_csv('Data/NonTarget_Node_df.csv')
+	#NonTarget_MTD_Node_df.to_csv('Data/NonTarget_MTD_Node_df.csv')
 
-	np.save('Data/MaxYeo400_Morel', MaxYeo400_Morel)
-	np.save('Data/MinYeo400_Morel', MinYeo400_Morel)
-	np.save('Data/Morel_Yeo400_M', Morel_Yeo400_M)
+	#np.save('Data/MaxYeo400_Morel', MaxYeo400_Morel)
+	#np.save('Data/MinYeo400_Morel', MinYeo400_Morel)
+	#np.save('Data/Morel_Yeo400_M', Morel_Yeo400_M)
 
 	### #plot results
 	# get a sense of the overal distribution of thalamocortical weights	
-	plt.figure()
-	sns.distplot(Morel_Yeo400_M[~np.isnan(Morel_Yeo400_M)])
+	#plt.figure()
+	#sns.distplot(Morel_Yeo400_M[~np.isnan(Morel_Yeo400_M)])
 
 	
-	for measure in measures:
-		#plt.figure()
-		sns.factorplot(x='Thalamic Nuclei', y=measure, data=Target_MTD_Node_df, kind='bar')	
-		plt.show()
+	# for measure in measures:
+	# 	#plt.figure()
+	# 	sns.factorplot(x='Thalamic Nuclei', y=measure, data=Target_MTD_Node_df, kind='bar')	
+	# 	plt.show()
 
 
