@@ -30,6 +30,7 @@ def map_target():
 	MinYeo400_Morel = np.argsort(M,1)[:,0:5]
 	return MaxYeo400_Morel, MinYeo400_Morel, Morel_Yeo400_M
 
+
 def map_indiv_target(subj, seq):
 	''' feed in individual matrix and find cortical targets for each thalamic nuclei'''
 	fn = '/home/despoB/connectome-thalamus/ThaGate/Matrices/NKI_%s_Morel_plus_Yeo400_%s_corrmat' %(subj, seq)
@@ -74,8 +75,8 @@ def fit_linear_model(y,x):
 	#need to take out nans first
 	Y = y[~np.isnan(y)]
 	X = x[~np.isnan(y)]
-	Y = y[~np.isnan(x)]
-	X = x[~np.isnan(x)]
+	Y = Y[~np.isnan(X)]
+	X = X[~np.isnan(X)]
 
 	#add constant
 	X = sm.add_constant(X)   
@@ -125,7 +126,7 @@ def run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = Fal
 				#if selecting certain cortical targets, select nodes before averaging
 				if np.alltrue(~np.isnan(nodeselection)): #
 					if y.ndim > 1:  # for q then no averaging 
-						y = np.mean(y[nodeselection[j,:],:],axis=0) #use nodeselection vector to select cortical nodes and average nodal metrics
+						y = np.nanmean(y[nodeselection[j,:],:],axis=0) #use nodeselection vector to select cortical nodes and average nodal metrics
 				
 				if MTD == True:
 					#extract cortical targets and thalamic nuclei ts						
@@ -133,7 +134,7 @@ def run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = Fal
 					# do MTD coupling
 					sma = coupling(ts[:,i],window)[1]
 					# ave coupling score for each thalamic nuclei and beweten its cortical targets
-					x = np.squeeze(np.mean(sma[:,len(i)-1:,][:,:,0:len(i)-1], axis=2)) #len(i)-1 is to determine number of cortical targets included (minus 15 thalamic nuclei)
+					x = np.squeeze(np.nanmean(sma[:,len(i)-1:,][:,:,0:len(i)-1], axis=2)) #len(i)-1 is to determine number of cortical targets included (minus 15 thalamic nuclei)
 					est = fit_linear_model(y,x)
 
 				if MTD == False:	
@@ -144,6 +145,7 @@ def run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = Fal
 		df = pd.concat([df, sdf])
 	
 	return df
+
 
 def YeoNetwork_parcellation():
 	''' parcelate thalamus using Yeo17 networks'''
@@ -161,8 +163,8 @@ def YeoNetwork_parcellation():
 	mask_value = Morel_mask==0
 
 	CIs = sort_CI(ParcelCIs)
-
 	return CIs
+
 
 def sort_CI(Thalamo_ParcelCIs):
     CIs = np.zeros(len(Thalamus_voxel_coordinate))
@@ -170,6 +172,7 @@ def sort_CI(Thalamo_ParcelCIs):
         CIs[i] = Thalamo_ParcelCIs[thalamus_voxel_index][0]
     CIs = CIs.astype(int)
     return CIs
+
 
 def visualize_parcellation(CIs, cmap):
     # show volum image
@@ -232,8 +235,10 @@ if __name__ == "__main__":
 	#get targets
 	#MaxYeo17_Morel, MaxYeo17_Morel_pM, MaxYeo400_Morel = map_target()
 	MaxYeo400_Morel, MinYeo400_Morel, Morel_Yeo400_M = map_target()
-	#Target_Node_df = run_regmodel(Subjects, seq, window, measures, MaxYeo400_Morel)
-	#Target_MTD_Node_df = run_regmodel(Subjects, seq, window, measures, MaxYeo400_Morel, MTD = True)
+
+	#reg
+	Target_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = False, nodeselection = MaxYeo400_Morel)
+	Target_MTD_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = True, nodeselection = MaxYeo400_Morel)
 	#NonTarget_Node_df = run_regmodel(Subjects, seq, window, measures, MinYeo400_Morel)
 	#NonTarget_MTD_Node_df = run_regmodel(Subjects, seq, window, measures, MinYeo400_Morel, MTD = True)
 	IndivTarget_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = True)
@@ -257,9 +262,13 @@ if __name__ == "__main__":
 	#sns.distplot(Morel_Yeo400_M[~np.isnan(Morel_Yeo400_M)])
 
 	
-	# for measure in measures:
-	# 	#plt.figure()
-	# 	sns.factorplot(x='Thalamic Nuclei', y=measure, data=Target_MTD_Node_df, kind='bar')	
-	# 	plt.show()
+	for measure in measures:
+		#plt.figure()
+		sns.factorplot(x='Thalamic Nuclei', y=measure, data=IndivTarget_MTD_Node_df, kind='bar')	
+		plt.axhline(y=3.2, color='r', linestyle='-')
+		plt.axhline(y=-3.2, color='r', linestyle='-')
+		plt.ylabel('t stat')
+		plt.title(measure)
+		plt.show()
 
 
