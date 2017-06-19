@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import statsmodels.api as sm
 from dFC_graph import coupling
 from matplotlib import colors
-%matplotlib qt
+#%matplotlib qt #don't forget this when plotting...
 
 def map_target():
 	'''use NKI dataset to find cortical targets(Yeo17 or Yeo400) for each thalamic nuclei'''
@@ -238,34 +238,36 @@ if __name__ == "__main__":
 	measures = ['PC', 'WMD', 'WW', 'BW', 'q']
 	
 	#### test thalamic correlations with these global topological measures: ['PC', 'WMD', 'WW', 'BW', 'q', 'phis']
-	#Global_df = run_regmodel(Subjects, seq, window, measures)
+	Global_df = run_regmodel(Subjects, seq, window, measures)
+	Global_df.to_csv('Data/Global_df.csv')
 
 	#### test nodal variables
 	#get targets
-	#MaxYeo17_Morel, MaxYeo17_Morel_pM, MaxYeo400_Morel = map_target()
 	MaxYeo400_Morel, MinYeo400_Morel, Morel_Yeo400_M = map_target()
+	np.save('Data/MaxYeo400_Morel', MaxYeo400_Morel)
+	np.save('Data/MinYeo400_Morel', MinYeo400_Morel)
+	np.save('Data/Morel_Yeo400_M', Morel_Yeo400_M)
 
-	#reg
-	Target_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = False, impose = True, nodeselection = MaxYeo400_Morel)
-	Target_MTD_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
-	#NonTarget_Node_df = run_regmodel(Subjects, seq, window, measures, MinYeo400_Morel)
-	#NonTarget_MTD_Node_df = run_regmodel(Subjects, seq, window, measures, MinYeo400_Morel, MTD = True)
-	IndivTarget_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = True, MTD = False, impose = True)
-	IndivTarget_MTD_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = True, MTD = True, impose = True)
+	#do regression
+	Target_Node_Impose_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = False, impose = True, nodeselection = MaxYeo400_Morel)
+	Target_Node_Impose_df.to_csv('Data/Target_Node_Impose_df.csv')
+
+	Target_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = False, impose = False, nodeselection = MaxYeo400_Morel)
+	Target_Node_df.to_csv('Data/Target_Node_df.csv')
+
+	Target_MTD_Node_Impose_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
+	Target_MTD_Node_Impose_df.to_csv('Data/Target_MTD_Node_Impose_df.csv')
+
+	Target_MTD_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = True, impose = False, nodeselection = MaxYeo400_Morel)
+	Target_MTD_Node_df.to_csv('Data/Target_MTD_Node_df.csv')
+
+	IndivTarget_MTD_Impose_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = True, MTD = True, impose = True)
+	IndivTarget_MTD_Impose_Node_df.to_csv('Data/IndivTarget_MTD_Impose_Node_df.csv')
+
+	IndivTarget_MTD_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = True, MTD = True, impose = False)
+	IndivTarget_MTD_Node_df.to_csv('Data/IndivTarget_MTD_Node_df.csv')
 
 
-	#save outputs
-	#Global_df.to_csv('Data/Global_df.csv')
-	#Target_Node_df.to_csv('Data/Target_Node_df.csv')
-	#Target_MTD_Node_df.to_csv('Data/Target_MTD_Node_df.csv')
-	#IndivTarget_Node_df.to_csv('Data/IndivTarget_Node_df.csv')
-	#IndivTarget_MTD_Node_df.to_csv('Data/IndivTarget_MTD_Node_df.csv')
-	#NonTarget_Node_df.to_csv('Data/NonTarget_Node_df.csv')
-	#NonTarget_MTD_Node_df.to_csv('Data/NonTarget_MTD_Node_df.csv')
-
-	#np.save('Data/MaxYeo400_Morel', MaxYeo400_Morel)
-	#np.save('Data/MinYeo400_Morel', MinYeo400_Morel)
-	#np.save('Data/Morel_Yeo400_M', Morel_Yeo400_M)
 
 	### #plot results
 	# get a sense of the overal distribution of thalamocortical weights	
@@ -273,13 +275,13 @@ if __name__ == "__main__":
 	#sns.distplot(Morel_Yeo400_M[~np.isnan(Morel_Yeo400_M)])
 
 	
-	for measure in measures:
-		#plt.figure()
-		sns.factorplot(x='Thalamic Nuclei', y=measure, data=IndivTarget_MTD_Node_df, kind='bar')	
-		plt.axhline(y=3.2, color='r', linestyle='-')
-		plt.axhline(y=-3.2, color='r', linestyle='-')
-		plt.ylabel('t stat')
-		plt.title(measure)
-		plt.show()
+	# for measure in measures:
+	# 	#plt.figure()
+	# 	sns.factorplot(x='Thalamic Nuclei', y=measure, data=IndivTarget_MTD_Node_df, kind='bar')	
+	# 	plt.axhline(y=3.2, color='r', linestyle='-')
+	# 	plt.axhline(y=-3.2, color='r', linestyle='-')
+	# 	plt.ylabel('t stat')
+	# 	plt.title(measure)
+	# 	plt.show()
 
 
