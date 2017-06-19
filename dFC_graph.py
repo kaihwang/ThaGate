@@ -2,20 +2,8 @@ import sys
 from FuncParcel import *
 import bct
 import os
-import pickle
-import glob
 import numpy as np
-import numpy.testing as npt
-import scipy
-from scipy.stats.stats import pearsonr
-from scipy.sparse.csgraph import minimum_spanning_tree
-from sklearn.feature_extraction import image
-from igraph import Graph, ADJ_UNDIRECTED, VertexClustering
-import nibabel as nib
-from itertools import combinations
 import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
 
 
 #Function to calculate graph and network metrics of dynamic functional connectivity
@@ -79,7 +67,7 @@ def cal_MTD(subject , sequence, roi, w):
 	return MTD #the dimension of MTD is time by ROI by ROI
 		
 
-def cal_dynamic_graph(MTD):
+def cal_dynamic_graph(MTD, impose=False):
 	'''calculate graph metrics across time(dynamic)'''
 	#setup outputs
 	time_points = MTD.shape[0]
@@ -89,11 +77,17 @@ def cal_dynamic_graph(MTD):
 	PC = np.zeros([MTD.shape[1],MTD.shape[0]])
 	WW = np.zeros([MTD.shape[1],MTD.shape[0]])
 	BW = np.zeros([MTD.shape[1],MTD.shape[0]])
+
+	#modularity
+	if impose:
+		ci = np.tile(np.loadtxt('/home/despoB/kaihwang/bin/ThaGate/400CI.txt'),[time_points,1]).T
 	
 	for i, t in enumerate(range(0,time_points)):
 		matrix = MTD[i,:,:]
+		
 		#modularity
-		ci[:,i], q[i] = bct.modularity_louvain_und_sign(matrix)
+		if impose == False:
+			ci[:,i], q[i] = bct.modularity_louvain_und_sign(matrix)
 		#PC
 		# for now, no negative weights
 		matrix[matrix<0] = 0
@@ -104,6 +98,9 @@ def cal_dynamic_graph(MTD):
 		WW[:,i] = cal_within_weight(matrix,ci[:,i])
 		## between Weight
 		BW[:,i] = cal_between_weight(matrix,ci[:,i])
+		# cal q using impsose CI partition
+		if impose:
+			q[i] = cal_modularity_w_imposed_community(matrix, ci[:,i])
 
 	return ci, q, PC, WMD, WW, BW	
 
@@ -147,11 +144,30 @@ def run_d_graph():
 	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_BW' %(subject,sequence,roi,w)
 	np.save(fn, BW)
 
+def run_impose_graph():
+	''' to loop through dynamic graph script, using impose ci partition'''
+	subject, sequence, roi, w = raw_input().split()
+	MTD = cal_MTD(subject , sequence, roi, int(w))
+	ci, q, PC, WMD, WW, BW = cal_dynamic_graph(MTD, impose=True)
+
+	# fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_impose_ci' %(subject,sequence,roi,w)
+	# np.save(fn, ci)
+	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_impose_q' %(subject,sequence,roi,w)
+	np.save(fn, q)
+	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_impose_PC' %(subject,sequence,roi,w)
+	np.save(fn, PC)
+	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_impose_WMD' %(subject,sequence,roi,w)
+	np.save(fn, WMD)
+	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_impose_WW' %(subject,sequence,roi,w)
+	np.save(fn, WW)
+	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_impose_BW' %(subject,sequence,roi,w)
+	np.save(fn, BW)
 
 
 if __name__ == "__main__":
 
-	run_d_graph()
+	#run_d_graph()
+	run_impose_graph()
 
 
 

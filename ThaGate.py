@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import statsmodels.api as sm
 from dFC_graph import coupling
 from matplotlib import colors
+%matplotlib qt
 
 def map_target():
 	'''use NKI dataset to find cortical targets(Yeo17 or Yeo400) for each thalamic nuclei'''
@@ -43,9 +44,13 @@ def map_indiv_target(subj, seq):
 	return Max, Min
 
 
-def load_graph_metric(subj, seq, window, measure):
+def load_graph_metric(subj, seq, window, measure, impose = False):
 	'''shorthand to load graph metric'''
 	fn = '/home/despoB/connectome-thalamus/ThaGate/Graph/' + subj + '_' + str(seq) + '_' +'Morel_plus_Yeo400' + '_w' + str(window) + '_' + measure + '.npy'
+	
+	if impose:
+		fn = '/home/despoB/connectome-thalamus/ThaGate/Graph/' + subj + '_' + str(seq) + '_' +'Morel_plus_Yeo400' + '_w' + str(window) + '_impose_' + measure + '.npy'
+
 	y = np.load(fn)
 
 	if measure == 'phis':  #maxwell's calculation on club coeff transposed matrices
@@ -84,7 +89,7 @@ def fit_linear_model(y,x):
 	return est 
 
 
-def run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = False, nodeselection = np.nan):
+def run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = False, impose = False, nodeselection = np.nan):
 	''' wraper script to test thalamic acitivty's effect on global network properties
 	if calculating global metrics (eg, q, avePC), then set nodeselection = np.nan. 
 	if using MTD between neuclei and cortical targets as predictors, set MTD = True'''
@@ -100,7 +105,11 @@ def run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = Fal
 		sdf['Subject'] = subj
 
 		for measure in measures:
-			y = load_graph_metric(subj, seq, window, measure)
+
+			if impose == False:
+				y = load_graph_metric(subj, seq, window, measure, impose = False)
+			if impose == True:
+				y = load_graph_metric(subj, seq, window, measure, impose = True)
 
 			#set it to nan for cal global metrics, average across nodes
 			if np.isnan(nodeselection).all(): 
@@ -226,10 +235,10 @@ if __name__ == "__main__":
 	#for now use TR645	
 	seq = 645
 	window = 16	
-	measures = ['PC', 'WMD', 'WW', 'BW', 'q', 'phis']
+	measures = ['PC', 'WMD', 'WW', 'BW', 'q']
 	
 	#### test thalamic correlations with these global topological measures: ['PC', 'WMD', 'WW', 'BW', 'q', 'phis']
-	Global_df = run_regmodel(Subjects, seq, window, measures)
+	#Global_df = run_regmodel(Subjects, seq, window, measures)
 
 	#### test nodal variables
 	#get targets
@@ -237,18 +246,20 @@ if __name__ == "__main__":
 	MaxYeo400_Morel, MinYeo400_Morel, Morel_Yeo400_M = map_target()
 
 	#reg
-	Target_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = False, nodeselection = MaxYeo400_Morel)
-	Target_MTD_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = True, nodeselection = MaxYeo400_Morel)
+	Target_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = False, impose = True, nodeselection = MaxYeo400_Morel)
+	Target_MTD_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
 	#NonTarget_Node_df = run_regmodel(Subjects, seq, window, measures, MinYeo400_Morel)
 	#NonTarget_MTD_Node_df = run_regmodel(Subjects, seq, window, measures, MinYeo400_Morel, MTD = True)
-	IndivTarget_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = True)
-	IndivTarget_MTD_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = True, MTD = True)
+	IndivTarget_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = True, MTD = False, impose = True)
+	IndivTarget_MTD_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = True, MTD = True, impose = True)
 
 
 	#save outputs
 	#Global_df.to_csv('Data/Global_df.csv')
 	#Target_Node_df.to_csv('Data/Target_Node_df.csv')
 	#Target_MTD_Node_df.to_csv('Data/Target_MTD_Node_df.csv')
+	#IndivTarget_Node_df.to_csv('Data/IndivTarget_Node_df.csv')
+	#IndivTarget_MTD_Node_df.to_csv('Data/IndivTarget_MTD_Node_df.csv')
 	#NonTarget_Node_df.to_csv('Data/NonTarget_Node_df.csv')
 	#NonTarget_MTD_Node_df.to_csv('Data/NonTarget_MTD_Node_df.csv')
 
