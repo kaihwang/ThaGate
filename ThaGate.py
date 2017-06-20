@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import statsmodels.api as sm
 from dFC_graph import coupling
 from matplotlib import colors
+import pickle as pickle
 #%matplotlib qt #don't forget this when plotting...
 
 def map_target():
@@ -89,7 +90,7 @@ def fit_linear_model(y,x):
 	return est 
 
 
-def run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = False, impose = False, nodeselection = np.nan):
+def run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = False, impose = False, nodeselection = np.nan, saveobj = False):
 	''' wraper script to test thalamic acitivty's effect on global network properties
 	if calculating global metrics (eg, q, avePC), then set nodeselection = np.nan. 
 	if using MTD between neuclei and cortical targets as predictors, set MTD = True'''
@@ -151,9 +152,17 @@ def run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = Fal
 
 				sdf[measure].loc[sdf['Thalamic Nuclei'] == Nuclei[j]] = est.tvalues[1]
 
+				if saveobj:
+					fn = '/home/despoB/connectome-thalamus/ThaGate/Graph/'+subj+'_'+str(seq)+'_'+str(window)+'_'+measure+'_reg_est.pickle' 
+					save_object(est, fn)
+
 		df = pd.concat([df, sdf])
 	
 	return df
+
+def save_object(obj, filename):
+    with open(filename, 'wb') as output:
+        pickle.dump(obj, output, pickle.HIGHEST_PROTOCOL)
 
 
 def YeoNetwork_parcellation():
@@ -274,14 +283,18 @@ if __name__ == "__main__":
 	#plt.figure()
 	#sns.distplot(Morel_Yeo400_M[~np.isnan(Morel_Yeo400_M)])
 
-	
-	# for measure in measures:
-	# 	#plt.figure()
-	# 	sns.factorplot(x='Thalamic Nuclei', y=measure, data=IndivTarget_MTD_Node_df, kind='bar')	
-	# 	plt.axhline(y=3.2, color='r', linestyle='-')
-	# 	plt.axhline(y=-3.2, color='r', linestyle='-')
-	# 	plt.ylabel('t stat')
-	# 	plt.title(measure)
-	# 	plt.show()
+	#sns.set_context("poster")
+	for measure in measures:
+		#plt.figure()
+		sns.set_context("poster", font_scale=1.7)
+		#plt.figure(figsize=(8, 6))
+		sns_plot = sns.factorplot(x='Thalamic Nuclei', y=measure, data=IndivTarget_MTD_Node_df , kind='bar', size=7, aspect=2.5)	
+		plt.axhline(y=3.2, color='r', linestyle='-')
+		plt.axhline(y=-3.2, color='r', linestyle='-')
+		plt.ylabel('t stat')
+		plt.title(measure)
+		fn = measure + '.png'
+		sns_plot.savefig(fn)
+		#plt.show()
 
 
