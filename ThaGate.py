@@ -288,7 +288,7 @@ if __name__ == "__main__":
 		#plt.figure()
 		sns.set_context("poster", font_scale=1.7)
 		#plt.figure(figsize=(8, 6))
-		sns_plot = sns.factorplot(x='Thalamic Nuclei', y=measure, data=IndivTarget_MTD_Node_df , kind='bar', size=7, aspect=2.5)	
+		sns_plot = sns.factorplot(x='Thalamic Nuclei', y=measure, data=Target_MTD_Node_Impose_df , kind='bar', size=7, aspect=2.5)	
 		plt.axhline(y=3.2, color='r', linestyle='-')
 		plt.axhline(y=-3.2, color='r', linestyle='-')
 		plt.ylabel('t stat')
