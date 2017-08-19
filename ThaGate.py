@@ -90,7 +90,7 @@ def fit_linear_model(y,x):
 	return est 
 
 
-def run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = False, impose = False, nodeselection = np.nan, saveobj = False):
+def run_regmodel(Subjects, seq, window, measures, HCP = False, IndivTarget = False, MTD = False, impose = False, nodeselection = np.nan, saveobj = False):
 	''' wraper script to test thalamic acitivty's effect on global network properties
 	if calculating global metrics (eg, q, avePC), then set nodeselection = np.nan. 
 	if using MTD between neuclei and cortical targets as predictors, set MTD = True'''
@@ -100,17 +100,29 @@ def run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = Fal
 	
 	#loop through subjects
 	for i, subj in enumerate(Subjects):
+		
 		#create subject dataframe
 		sdf = pd.DataFrame(columns=('Subject', 'Thalamic Nuclei', 'PC', 'WMD', 'WW', 'BW', 'q', 'phis')) 
 		sdf['Thalamic Nuclei'] = Nuclei
 		sdf['Subject'] = subj
 
+		#two runs for HCP
+		if HCP:
+			seq1 = seq+'_LR'
+			seq2 = seq+'_RL'
+
 		for measure in measures:
 
 			if impose == False:
-				y = load_graph_metric(subj, seq, window, measure, impose = False)
+				if not HCP:
+					y = load_graph_metric(subj, seq, window, measure, impose = False)
+				else:
+					y = np.hstack((load_graph_metric(subj, seq1, window, measure, impose = False), load_graph_metric(subj, seq2, window, measure, impose = False)))
 			if impose == True:
-				y = load_graph_metric(subj, seq, window, measure, impose = True)
+				if not HCP:
+					y = load_graph_metric(subj, seq, window, measure, impose = True)
+				else:
+					y = np.hstack((load_graph_metric(subj, seq1, window, measure, impose = True), load_graph_metric(subj, seq2, window, measure, impose = True)))
 
 			#set it to nan for cal global metrics, average across nodes
 			if np.isnan(nodeselection).all(): 
@@ -119,12 +131,18 @@ def run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = Fal
 					y = np.nanmean(y, axis=0)
 
 			#if not doing coupling, then use thalamic ts		
-			if MTD == False: 		
-				x = tha_morel_ts(subj, seq, window)	
+			if MTD == False: 	
+				if not HCP:	
+					x = tha_morel_ts(subj, seq, window)	
+				if HCP:
+					x = np.vstack((tha_morel_ts(subj, seq1, window), tha_morel_ts(subj, seq2, window)))
 
 			#if doing coupling, then extract thalamic and cortical ts and do MTD coupling calculation later	
 			if MTD == True:
-				ts = tha_morel_plus_cortical_ts(subj, seq, window)	
+				if not HCP:
+					ts = tha_morel_plus_cortical_ts(subj, seq, window)	
+				if HCP:
+					ts = np.vstack((tha_morel_plus_cortical_ts(subj, seq1, window), tha_morel_plus_cortical_ts(subj, seq2, window)))
 
 			# if using individual matrices to find cortical targets	
 			if IndivTarget:
@@ -145,7 +163,10 @@ def run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = Fal
 					sma = coupling(ts[:,i],window)[1]
 					# ave coupling score for each thalamic nuclei and beweten its cortical targets
 					x = np.squeeze(np.nanmean(sma[:,len(i)-1:,][:,:,0:len(i)-1], axis=2)) #len(i)-1 is to determine number of cortical targets included (minus 15 thalamic nuclei)
-					est = fit_linear_model(y,x)
+					try:
+						est = fit_linear_model(y,x)
+					except:
+						pass
 
 				if MTD == False:	
 					est = fit_linear_model(y,x[:,j])
@@ -238,63 +259,68 @@ if __name__ == "__main__":
 
 	#get list of NKI subjects
 	with open("/home/despoB/kaihwang/bin/ThaGate/NKI_subjlist") as f:
-		Subjects = [line.rstrip() for line in f]
-
+		NKISubjects = [line.rstrip() for line in f]
+	
+	with open("/home/despoB/kaihwang/bin/ThaGate/HCP_subjlist") as f:
+		HCPSubjects = [line.rstrip() for line in f]
+		
 	##global variables
 	#for now use TR645	
-	seq = 645
-	window = 16	
+	#window = 16	
 	measures = ['PC', 'WMD', 'WW', 'BW', 'q']
 	
 	#### test thalamic correlations with these global topological measures: ['PC', 'WMD', 'WW', 'BW', 'q', 'phis']
-	Global_df = run_regmodel(Subjects, seq, window, measures)
-	Global_df.to_csv('Data/Global_df.csv')
+	#Global_df = run_regmodel(Subjects, seq, window, measures)
+	#Global_df.to_csv('Data/Global_df.csv')
 
 	#### test nodal variables
-	#get targets
-	MaxYeo400_Morel, MinYeo400_Morel, Morel_Yeo400_M = map_target()
-	np.save('Data/MaxYeo400_Morel', MaxYeo400_Morel)
-	np.save('Data/MinYeo400_Morel', MinYeo400_Morel)
-	np.save('Data/Morel_Yeo400_M', Morel_Yeo400_M)
+	#get cortical ROI targets of each thalamic nuclei from morel atlas
+	#MaxYeo400_Morel, MinYeo400_Morel, Morel_Yeo400_M = map_target()
+	#np.save('Data/MaxYeo400_Morel', MaxYeo400_Morel)
+	#np.save('Data/MinYeo400_Morel', MinYeo400_Morel)
+	#np.save('Data/Morel_Yeo400_M', Morel_Yeo400_M)
+	MaxYeo400_Morel = np.load('Data/MaxYeo400_Morel.npy')
+	
+	###Past Explorations of regression models
+	#Target_Node_Impose_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = False, impose = True, nodeselection = MaxYeo400_Morel)
+	#Target_Node_Impose_df.to_csv('Data/Target_Node_Impose_df.csv')
 
-	#do regression
-	Target_Node_Impose_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = False, impose = True, nodeselection = MaxYeo400_Morel)
-	Target_Node_Impose_df.to_csv('Data/Target_Node_Impose_df.csv')
+	#Target_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = False, impose = False, nodeselection = MaxYeo400_Morel)
+	#Target_Node_df.to_csv('Data/Target_Node_df.csv')
 
-	Target_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = False, impose = False, nodeselection = MaxYeo400_Morel)
-	Target_Node_df.to_csv('Data/Target_Node_df.csv')
+	#Target_MTD_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = True, impose = False, nodeselection = MaxYeo400_Morel)
+	#Target_MTD_Node_df.to_csv('Data/Target_MTD_Node_df.csv')
 
-	Target_MTD_Node_Impose_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
-	Target_MTD_Node_Impose_df.to_csv('Data/Target_MTD_Node_Impose_df.csv')
+	#IndivTarget_MTD_Impose_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = True, MTD = True, impose = True)
+	#IndivTarget_MTD_Impose_Node_df.to_csv('Data/IndivTarget_MTD_Impose_Node_df.csv')
 
-	Target_MTD_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = True, impose = False, nodeselection = MaxYeo400_Morel)
-	Target_MTD_Node_df.to_csv('Data/Target_MTD_Node_df.csv')
+	#IndivTarget_MTD_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = True, MTD = True, impose = False)
+	#IndivTarget_MTD_Node_df.to_csv('Data/IndivTarget_MTD_Node_df.csv')
+	
 
-	IndivTarget_MTD_Impose_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = True, MTD = True, impose = True)
-	IndivTarget_MTD_Impose_Node_df.to_csv('Data/IndivTarget_MTD_Impose_Node_df.csv')
+	### Do Rest, NKI
+	#seq = 645
+	#window = 16
+	#NKI_Target_MTD_Node_Impose_df = run_regmodel(NKISubjects, seq, window, measures, HCP = False, IndivTarget = False, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
+	#NKI_Target_MTD_Node_Impose_df.to_csv('Data/NKI_Target_MTD_Node_Impose_df.csv')
 
-	IndivTarget_MTD_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = True, MTD = True, impose = False)
-	IndivTarget_MTD_Node_df.to_csv('Data/IndivTarget_MTD_Node_df.csv')
+	### Replicate Rest, HCP
+	#seq = 'rfMRI_REST1'
+	#window =15
+	#HCP_Rest_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
+	#HCP_Rest_Target_MTD_Node_df.to_csv('Data/HCP_Rest_Target_MTD_Node_Impose_df.csv')
+
+	### Do HCP tasks
+	seq = 'WM'
+	window =15
+	HCP_WM_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
+	HCP_WM_Target_MTD_Node_df.to_csv('Data/HCP_WM_Target_MTD_Node_Impose_df.csv')
+
+	seq = 'MOTOR'
+	window =15
+	HCP_MOTOR_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
+	HCP_MOTOR_Target_MTD_Node_df.to_csv('Data/HCP_MOTOR_Target_MTD_Node_Impose_df.csv')
 
 
-
-	### #plot results
-	# get a sense of the overal distribution of thalamocortical weights	
-	#plt.figure()
-	#sns.distplot(Morel_Yeo400_M[~np.isnan(Morel_Yeo400_M)])
-
-	#sns.set_context("poster")
-	for measure in measures:
-		#plt.figure()
-		sns.set_context("poster", font_scale=1.7)
-		#plt.figure(figsize=(8, 6))
-		sns_plot = sns.factorplot(x='Thalamic Nuclei', y=measure, data=Target_MTD_Node_Impose_df , kind='bar', size=7, aspect=2.5)	
-		plt.axhline(y=3.2, color='r', linestyle='-')
-		plt.axhline(y=-3.2, color='r', linestyle='-')
-		plt.ylabel('t stat')
-		plt.title(measure)
-		fn = measure + '.png'
-		sns_plot.savefig(fn)
-		#plt.show()
 
 
