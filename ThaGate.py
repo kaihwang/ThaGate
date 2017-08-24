@@ -33,15 +33,26 @@ def map_target():
 	return MaxYeo400_Morel, MinYeo400_Morel, Morel_Yeo400_M
 
 
-def map_indiv_target(subj, seq):
+def map_indiv_target(subj, seq, dset):
 	''' feed in individual matrix and find cortical targets for each thalamic nuclei'''
-	fn = '/home/despoB/connectome-thalamus/ThaGate/Matrices/NKI_%s_Morel_plus_Yeo400_%s_corrmat' %(subj, seq)
-	M = np.loadtxt(fn)
+	
+	if dset == 'NKI':
+		fn = '/home/despoB/connectome-thalamus/ThaGate/Matrices/%s_%s_Morel_plus_Yeo400_%s_corrmat' %(dset, subj, seq)
+		M = np.loadtxt(fn)
+		
+	
+	if dset == 'HCP':
+		fn = '/home/despoB/connectome-thalamus/ThaGate/Matrices/%s_%s_Morel_plus_Yeo400_%s_corrmat' %(dset, subj, 'rfMRI_REST2_RL')	
+		M1 = np.loadtxt(fn)
+		fn = '/home/despoB/connectome-thalamus/ThaGate/Matrices/%s_%s_Morel_plus_Yeo400_%s_corrmat' %(dset, subj, 'rfMRI_REST2_LR')
+		M2 = np.loadtxt(fn)
+		M = (M1 + M2)/2
+
 	np.fill_diagonal(M, 0)
 	M[np.isnan(M)] = 0
 	Cortical_M = M[400:,0:400]
 	Max = np.argsort(Cortical_M,1)[:,-1:-6:-1] 
-	Min = np.argsort(Cortical_M,1)[:,0:5]
+	Min = np.argsort(Cortical_M,1)[:,0:5]	
 	return Max, Min
 
 
@@ -89,6 +100,29 @@ def fit_linear_model(y,x):
 	est = sm.OLS(Y, X).fit() #OLS fit
 	return est 
 
+
+def cortical_graph(Subjects, seq, measures, HCP = True, impose = True):
+	'''wrapper function to compile coritcal ROI's graph metrics into a dataframe'''
+	df = pd.DataFrame(columns=('Subject', 'PC', 'WMD', 'WW', 'BW', 'q', 'phis')) 
+
+	if HCP:
+		seq1 = seq+'_LR'
+		seq2 = seq+'_RL'
+	
+	#loop
+	for i, subj in enumerate(Subjects):
+		sdf = pd.DataFrame(columns=('Subject', 'PC', 'WMD', 'WW', 'BW', 'q', 'phis'), index = [0]) 
+		sdf.loc[0]['Subject'] = subj
+
+		for measure in measures:
+			if not HCP:
+				y = load_graph_metric(subj, seq, window, measure, impose = impose)
+			if HCP:
+				y = np.hstack((load_graph_metric(subj, seq1, window, measure, impose = True), load_graph_metric(subj, seq2, window, measure, impose = True)))	
+
+			sdf.loc[0][measure]= np.nanmean(y)		
+		df = pd.concat([df, sdf])		
+	return df	
 
 def run_regmodel(Subjects, seq, window, measures, HCP = False, IndivTarget = False, MTD = False, impose = False, nodeselection = np.nan, saveobj = False):
 	''' wraper script to test thalamic acitivty's effect on global network properties
@@ -146,8 +180,12 @@ def run_regmodel(Subjects, seq, window, measures, HCP = False, IndivTarget = Fal
 
 			# if using individual matrices to find cortical targets	
 			if IndivTarget:
-				nodeselection, _ = map_indiv_target(subj, seq)	
-				
+				if not HCP:
+					nodeselection, _ = map_indiv_target(subj, seq, dset = 'NKI')	
+				if HCP:
+					nodeselection, _ = map_indiv_target(subj, seq, dset = 'HCP')
+
+
 			#fit one var at a time because of potential co-linearity between nuclei
 			for j in np.arange(len(Nuclei)):
 
@@ -305,22 +343,27 @@ if __name__ == "__main__":
 	#NKI_Target_MTD_Node_Impose_df.to_csv('Data/NKI_Target_MTD_Node_Impose_df.csv')
 
 	### Replicate Rest, HCP
-	#seq = 'rfMRI_REST1'
-	#window =15
-	#HCP_Rest_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
-	#HCP_Rest_Target_MTD_Node_df.to_csv('Data/HCP_Rest_Target_MTD_Node_Impose_df.csv')
+	seq = 'rfMRI_REST1'
+	window =15
+	HCP_Rest_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = True, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
+	HCP_Rest_Target_MTD_Node_df.to_csv('Data/HCP_Rest_indvTarget_MTD_Node_Impose_df.csv')
+	HCP_Rest_Cortical_Graph_df = cortical_graph(HCPSubjects, seq, measures, HCP = True, impose = True)
+	HCP_Rest_Cortical_Graph_df.to_csv('Data/HCP_Rest_Cortical_Graph_df.csv')
 
 	### Do HCP tasks
 	seq = 'WM'
 	window =15
-	HCP_WM_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
-	HCP_WM_Target_MTD_Node_df.to_csv('Data/HCP_WM_Target_MTD_Node_Impose_df.csv')
+	HCP_WM_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = True, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
+	HCP_WM_Target_MTD_Node_df.to_csv('Data/HCP_WM_indvTarget_MTD_Node_Impose_df.csv')
+	HCP_WM_Cortical_Graph_df = cortical_graph(HCPSubjects, seq, measures, HCP = True, impose = True)
+	HCP_WM_Cortical_Graph_df.to_csv('Data/HCP_WM_Cortical_Graph_df.csv')
 
 	seq = 'MOTOR'
 	window =15
-	HCP_MOTOR_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
-	HCP_MOTOR_Target_MTD_Node_df.to_csv('Data/HCP_MOTOR_Target_MTD_Node_Impose_df.csv')
-
+	HCP_MOTOR_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = True, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
+	HCP_MOTOR_Target_MTD_Node_df.to_csv('Data/HCP_MOTOR_indvTarget_MTD_Node_Impose_df.csv')
+	HCP_MOTOR_Cortical_Graph_df = cortical_graph(HCPSubjects, seq, measures, HCP = True, impose = True)
+	HCP_MOTOR_Cortical_Graph_df.to_csv('Data/HCP_MOTOR_Cortical_Graph_df.csv')
 
 
 

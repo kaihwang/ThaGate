@@ -3,10 +3,10 @@ export DISPLAY=""
 
 #HCP
 cd /home/despoB/connectome-data
-for s in 100206; do  #$(/bin/ls -d *)
+for s in 100307; do  #$(cat /home/despoB/kaihwang/bin/ThaGate/HCP_subjlist)
 	for roi in Morel_plus_Yeo400; do #Morel_plus_Yeo17 
-
-		for sequence in rfMRI_REST1_LR rfMRI_REST1_RL rfMRI_REST2_LR rfMRI_REST2_RL EMOTION_LR EMOTION_RL GAMBLING_LR GAMBLING_RL MOTOR_LR MOTOR_RL SOCIAL_LR SOCIAL_RL LANGUAGE_LR LANGUAGE_RL WM_LR WM_RL RELATIONAL_LR RELATIONAL_RL; do
+		#EMOTION_LR EMOTION_RL GAMBLING_LR GAMBLING_RL SOCIAL_LR SOCIAL_RL LANGUAGE_LR LANGUAGE_RL RELATIONAL_LR RELATIONAL_RL
+		for sequence in rfMRI_REST1_LR rfMRI_REST1_RL rfMRI_REST2_LR rfMRI_REST2_RL MOTOR_LR MOTOR_RL WM_LR WM_RL; do
 			echo "${s} ${sequence} ${roi} 15" | python /home/despoB/kaihwang/bin/ThaGate/dFC_graph.py
 		done
 	done
