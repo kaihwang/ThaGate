@@ -87,8 +87,9 @@ def cal_dynamic_graph(MTD, impose=False, threshold = False):
 		
 		#threshold here
 		if threshold:
-			matrix = bct.threshold_porportional(matrix, threshold)
-
+			matrix = bct.threshold_proportional(matrix, threshold)
+					 #bct.threshold_proportional
+ 	
 		#modularity
 		if impose == False:
 			ci[:,i], q[i] = bct.modularity_louvain_und_sign(matrix)

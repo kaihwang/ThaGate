@@ -56,13 +56,19 @@ def map_indiv_target(subj, seq, dset):
 	return Max, Min
 
 
-def load_graph_metric(subj, seq, window, measure, impose = False):
+def load_graph_metric(subj, seq, window, measure, impose = False, thresh = False):
 	'''shorthand to load graph metric'''
 	fn = '/home/despoB/connectome-thalamus/ThaGate/Graph/' + subj + '_' + str(seq) + '_' +'Morel_plus_Yeo400' + '_w' + str(window) + '_' + measure + '.npy'
 	
 	if impose:
 		fn = '/home/despoB/connectome-thalamus/ThaGate/Graph/' + subj + '_' + str(seq) + '_' +'Morel_plus_Yeo400' + '_w' + str(window) + '_impose_' + measure + '.npy'
 
+		if thresh:
+			fn = '/home/despoB/connectome-thalamus/ThaGate/Graph/' + subj + '_' + str(seq) + '_' +'Morel_plus_Yeo400' + '_w' + str(window) + '_impose_t0.1_' + measure + '.npy'
+	
+	if thresh:
+		fn = '/home/despoB/connectome-thalamus/ThaGate/Graph/' + subj + '_' + str(seq) + '_' +'Morel_plus_Yeo400' + '_w' + str(window) + '_t0.1_' + measure + '.npy'
+	
 	y = np.load(fn)
 
 	if measure == 'phis':  #maxwell's calculation on club coeff transposed matrices
@@ -124,7 +130,7 @@ def cortical_graph(Subjects, seq, measures, HCP = True, impose = True):
 		df = pd.concat([df, sdf])		
 	return df	
 
-def run_regmodel(Subjects, seq, window, measures, HCP = False, IndivTarget = False, MTD = False, impose = False, nodeselection = np.nan, saveobj = False):
+def run_regmodel(Subjects, seq, window, measures, HCP = False, IndivTarget = False, MTD = False, impose = False, nodeselection = np.nan, thresh = False, saveobj = False):
 	''' wraper script to test thalamic acitivty's effect on global network properties
 	if calculating global metrics (eg, q, avePC), then set nodeselection = np.nan. 
 	if using MTD between neuclei and cortical targets as predictors, set MTD = True'''
@@ -149,14 +155,14 @@ def run_regmodel(Subjects, seq, window, measures, HCP = False, IndivTarget = Fal
 
 			if impose == False:
 				if not HCP:
-					y = load_graph_metric(subj, seq, window, measure, impose = False)
+					y = load_graph_metric(subj, seq, window, measure, impose = False, thresh = thresh)
 				else:
-					y = np.hstack((load_graph_metric(subj, seq1, window, measure, impose = False), load_graph_metric(subj, seq2, window, measure, impose = False)))
+					y = np.hstack((load_graph_metric(subj, seq1, window, measure, impose = False, thresh = thresh), load_graph_metric(subj, seq2, window, measure, impose = False, thresh = thresh)))
 			if impose == True:
 				if not HCP:
-					y = load_graph_metric(subj, seq, window, measure, impose = True)
+					y = load_graph_metric(subj, seq, window, measure, impose = True, thresh = thresh)
 				else:
-					y = np.hstack((load_graph_metric(subj, seq1, window, measure, impose = True), load_graph_metric(subj, seq2, window, measure, impose = True)))
+					y = np.hstack((load_graph_metric(subj, seq1, window, measure, impose = True, thresh = thresh), load_graph_metric(subj, seq2, window, measure, impose = True, thresh = thresh)))
 
 			#set it to nan for cal global metrics, average across nodes
 			if np.isnan(nodeselection).all(): 
@@ -345,23 +351,52 @@ if __name__ == "__main__":
 	### Replicate Rest, HCP
 	seq = 'rfMRI_REST1'
 	window =15
-	HCP_Rest_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = True, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
-	HCP_Rest_Target_MTD_Node_df.to_csv('Data/HCP_Rest_indvTarget_MTD_Node_Impose_df.csv')
+	
 	HCP_Rest_Cortical_Graph_df = cortical_graph(HCPSubjects, seq, measures, HCP = True, impose = True)
 	HCP_Rest_Cortical_Graph_df.to_csv('Data/HCP_Rest_Cortical_Graph_df.csv')
+
+	HCP_Rest_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = True, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
+	HCP_Rest_Target_MTD_Node_df.to_csv('Data/HCP_Rest_indvTarget_MTD_Node_Impose_df.csv')
+	HCP_Rest_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
+	HCP_Rest_Target_MTD_Node_df.to_csv('Data/HCP_Rest_MTD_Node_Impose_df.csv')
+	HCP_Rest_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, nodeselection = MaxYeo400_Morel)
+	HCP_Rest_Target_MTD_Node_df.to_csv('Data/HCP_Rest_MTD_Node_df.csv')
+	HCP_Rest_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, nodeselection = MaxYeo400_Morel, thresh = True)
+	HCP_Rest_Target_MTD_Node_df.to_csv('Data/HCP_Rest_MTD_Node_thresh_df.csv')
+	HCP_Rest_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = True, nodeselection = MaxYeo400_Morel, thresh = True)
+	HCP_Rest_Target_MTD_Node_df.to_csv('Data/HCP_Rest_MTD_Node_Impose_thresh_df.csv')
+	
 
 	### Do HCP tasks
 	seq = 'WM'
 	window =15
-	HCP_WM_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = True, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
-	HCP_WM_Target_MTD_Node_df.to_csv('Data/HCP_WM_indvTarget_MTD_Node_Impose_df.csv')
 	HCP_WM_Cortical_Graph_df = cortical_graph(HCPSubjects, seq, measures, HCP = True, impose = True)
 	HCP_WM_Cortical_Graph_df.to_csv('Data/HCP_WM_Cortical_Graph_df.csv')
+
+	HCP_WM_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = True, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
+	HCP_WM_Target_MTD_Node_df.to_csv('Data/HCP_WM_indvTarget_MTD_Node_Impose_df.csv')
+	HCP_WM_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
+	HCP_WM_Target_MTD_Node_df.to_csv('Data/HCP_WM_MTD_Node_Impose_df.csv')
+	HCP_WM_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, nodeselection = MaxYeo400_Morel)
+	HCP_WM_Target_MTD_Node_df.to_csv('Data/HCP_WM_MTD_Node_df.csv')
+	HCP_WM_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, nodeselection = MaxYeo400_Morel, thresh = True)
+	HCP_WM_Target_MTD_Node_df.to_csv('Data/HCP_WM_MTD_Node_thresh_df.csv')
+	HCP_WM_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = True, nodeselection = MaxYeo400_Morel, thresh = True)
+	HCP_WM_Target_MTD_Node_df.to_csv('Data/HCP_WM_MTD_Node_Impose_thresh_df.csv')
 
 	seq = 'MOTOR'
 	window =15
 	HCP_MOTOR_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = True, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
 	HCP_MOTOR_Target_MTD_Node_df.to_csv('Data/HCP_MOTOR_indvTarget_MTD_Node_Impose_df.csv')
+	HCP_MOTOR_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
+	HCP_MOTOR_Target_MTD_Node_df.to_csv('Data/HCP_MOTOR_MTD_Node_Impose_df.csv')
+	HCP_MOTOR_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, nodeselection = MaxYeo400_Morel)
+	HCP_MOTOR_Target_MTD_Node_df.to_csv('Data/HCP_MOTOR_MTD_Node_df.csv')
+	HCP_MOTOR_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, nodeselection = MaxYeo400_Morel, thresh = True)
+	HCP_MOTOR_Target_MTD_Node_df.to_csv('Data/HCP_MOTOR_MTD_Node_thresh_df.csv')
+	HCP_MOTOR_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = True, nodeselection = MaxYeo400_Morel, thresh = True)
+	HCP_MOTOR_Target_MTD_Node_df.to_csv('Data/HCP_MOTOR_MTD_Node_Impose_thresh_df.csv')
+
 	HCP_MOTOR_Cortical_Graph_df = cortical_graph(HCPSubjects, seq, measures, HCP = True, impose = True)
 	HCP_MOTOR_Cortical_Graph_df.to_csv('Data/HCP_MOTOR_Cortical_Graph_df.csv')
 
