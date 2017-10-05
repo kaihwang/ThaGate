@@ -1,7 +1,7 @@
 SCRIPT='/home/despoB/kaihwang/bin/ThaGate'
 
 cd /home/despoB/connectome-data
-for s in $(cat ~/bin/ThaGate/HCP_subjlist); do  #$(/bin/ls -d *)
+for s in $(cat ~/bin/ThaGate/HCP_subjlist); do  #$(/bin/ls -d *)  #/home/despoB/kaihwang/bin/HCP-processing/Data/unrelated.csv is the same
 	#if [ ! -e "/home/despoB/kaihwang/Rest/Graph/gsetCI_${Subject}.mat" ]; then
 	sed "s/s in 100307/s in ${s}/g" < ${SCRIPT}/python_qsub.sh > ~/tmp/dFC_graph${s}.sh
 	qsub -l mem_free=7G -V -M kaihwang -m e -e ~/tmp -o ~/tmp ~/tmp/dFC_graph${s}.sh

@@ -33,8 +33,8 @@ def cal_vox_pcorr_mat(subject , sequence):
 	np.savetxt(fn, pcorr_mat)	
 
 
-# subject, sequence, roi = raw_input().split()
-# function_cal_pcorr_mat(subject, sequence, roi)
+subject, sequence, roi = raw_input().split()
+function_cal_pcorr_mat(subject, sequence, roi)
 
-subject, sequence = raw_input().split()
-cal_vox_pcorr_mat(subject, sequence)
+#subject, sequence = raw_input().split()
+#cal_vox_pcorr_mat(subject, sequence)
