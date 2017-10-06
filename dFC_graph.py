@@ -5,6 +5,7 @@ import os
 import numpy as np
 import pandas as pd
 import os.path
+from scipy import stats, linalg
 
 #Function to calculate graph and network metrics of dynamic functional connectivity
 
@@ -55,12 +56,21 @@ def coupling(data,window):
     
     return (mtd, sma)
 
-def cal_MTD(subject , sequence, roi, w):
-	''' wraper function to return MTD estimates'''
+def cal_MTD(subject , sequence, roi, w, partial = False):
+	''' wraper function to return MTD estimates
+	if set partial = True, '''
 	ts_path = '/home/despoB/kaihwang/Rest/ThaGate/NotBackedUp/'
-	pcorr_path = '/home/despoB/kaihwang/Rest/ThaGate/Matrices/'
+	#pcorr_path = '/home/despoB/kaihwang/Rest/ThaGate/Matrices/'
 	fn = ts_path + subject + '_%s_%s_000.netts' %(roi, sequence)
 	ts = np.loadtxt(fn)
+	
+	if partial:
+		tts = ts[400:].T.copy() 
+		cts = ts[0:400].T.copy()
+		for j in range(400):
+			b = linalg.lstsq(tts, cts[:,j])[0]
+			ts[j,:] = cts[:,j]-tts.dot(b)
+
 	ts = ts.T
 	_, MTD = coupling(ts, w) #the smoothing window is set to 14 for HCP, for NKI 645 15
 
@@ -88,7 +98,6 @@ def cal_dynamic_graph(MTD, impose=False, threshold = False):
 		#threshold here
 		if threshold:
 			matrix = bct.threshold_proportional(matrix, threshold)
-					 #bct.threshold_proportional
  	
 		#modularity
 		if impose == False:
@@ -135,115 +144,47 @@ def cal_between_weight(matrix, ci):
 	return BW
 
 
-def run_d_graph(subject, sequence, roi, w):
-	''' to loop through dynamic graph script'''
+def run_d_graph(subject, sequence, roi, w, thresh, imp = True, part = True):
+	''' to loop through dynamic graph script
+	if need to threshold matrices, set thresh
+	imp is to decide whether to impose group template
+	part is to decide whether to partial variance from tha
+	'''
 	#subject, sequence, roi, w = raw_input().split()
 	
 	#fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_q.npy' %(subject,sequence,roi,w)
 	#if not os.path.exists(fn):
 		
-	MTD = cal_MTD(subject , sequence, roi, int(w))
-	ci, q, PC, WMD, WW, BW = cal_dynamic_graph(MTD)
-
-	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_ci' %(subject,sequence,roi,w)
-	np.save(fn, ci)
-	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_q' %(subject,sequence,roi,w)
-	np.save(fn, q)
-	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_PC' %(subject,sequence,roi,w)
-	np.save(fn, PC)
-	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_WMD' %(subject,sequence,roi,w)
-	np.save(fn, WMD)
-	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_WW' %(subject,sequence,roi,w)
-	np.save(fn, WW)
-	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_BW' %(subject,sequence,roi,w)
-	np.save(fn, BW)
-
-
-def run_impose_graph(subject, sequence, roi, w):
-	''' to loop through dynamic graph script, using impose ci partition'''
-	#subject, sequence, roi, w = raw_input().split()
-
-	#fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_impose_q.npy' %(subject,sequence,roi,w)
-	#if not os.path.exists(fn):
-
-	MTD = cal_MTD(subject , sequence, roi, int(w))
-	ci, q, PC, WMD, WW, BW = cal_dynamic_graph(MTD, impose=True)
+	MTD = cal_MTD(subject , sequence, roi, int(w), partial = part)
+	ci, q, PC, WMD, WW, BW = cal_dynamic_graph(MTD, impose = imp, threshold = thresh)
 
 	# fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_impose_ci' %(subject,sequence,roi,w)
 	# np.save(fn, ci)
-	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_impose_q' %(subject,sequence,roi,w)
+	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_impose%s_t%s_partial%s_q' %(subject,sequence,roi,w,imp,thresh,part)
 	np.save(fn, q)
-	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_impose_PC' %(subject,sequence,roi,w)
+	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_impose%s_t%s_partial%s_PC' %(subject,sequence,roi,w,imp,thresh,part)
 	np.save(fn, PC)
-	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_impose_WMD' %(subject,sequence,roi,w)
+	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_impose%s_t%s_partial%s_WMD' %(subject,sequence,roi,w,imp,thresh,part)
 	np.save(fn, WMD)
-	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_impose_WW' %(subject,sequence,roi,w)
+	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_impose%s_t%s_partial%s_WW' %(subject,sequence,roi,w,imp,thresh,part)
 	np.save(fn, WW)
-	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_impose_BW' %(subject,sequence,roi,w)
-	np.save(fn, BW)
-
-def run_impose_thres_graph(subject, sequence, roi, w):
-	''' to loop through dynamic graph script, using impose ci partition'''
-	#subject, sequence, roi, w = raw_input().split()
-
-	#fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_impose_q.npy' %(subject,sequence,roi,w)
-	#if not os.path.exists(fn):
-
-	MTD = cal_MTD(subject , sequence, roi, int(w))
-	
-	thoresholds = np.arange(0.05, 0.16, 0.01)
-	
-	for thres in thresholds:
-		thres = 0.1
-		ci, q, PC, WMD, WW, BW = cal_dynamic_graph(MTD, impose=True, threshold = thres)
-
-
-	# fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_impose_ci' %(subject,sequence,roi,w)
-	# np.save(fn, ci)
-	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_impose_t%s_q' %(subject,sequence,roi,w,thres)
-	np.save(fn, q)
-	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_impose_t%s_PC' %(subject,sequence,roi,w,thres)
-	np.save(fn, PC)
-	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_impose_t%s_WMD' %(subject,sequence,roi,w,thres)
-	np.save(fn, WMD)
-	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_impose_t%s_WW' %(subject,sequence,roi,w,thres)
-	np.save(fn, WW)
-	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_impose_t%s_BW' %(subject,sequence,roi,w,thres)
+	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_impose%s_t%s_partial%s_BW' %(subject,sequence,roi,w,imp,thresh,part)
 	np.save(fn, BW)		
 
-def run_thres_graph(subject, sequence, roi, w):
-	''' to loop through dynamic graph script, using impose ci partition'''
-	#subject, sequence, roi, w = raw_input().split()
 
-	#fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_impose_q.npy' %(subject,sequence,roi,w)
-	#if not os.path.exists(fn):
-
-	MTD = cal_MTD(subject , sequence, roi, int(w))
-	thres = 0.1
-	ci, q, PC, WMD, WW, BW = cal_dynamic_graph(MTD, impose=False, threshold = thres)
-
-	# fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_impose_ci' %(subject,sequence,roi,w)
-	# np.save(fn, ci)
-	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_t%s_q' %(subject,sequence,roi,w,thres)
-	np.save(fn, q)
-	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_t%s_PC' %(subject,sequence,roi,w,thres)
-	np.save(fn, PC)
-	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_t%s_WMD' %(subject,sequence,roi,w,thres)
-	np.save(fn, WMD)
-	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_t%s_WW' %(subject,sequence,roi,w,thres)
-	np.save(fn, WW)
-	fn = '/home/despoB/kaihwang/Rest/ThaGate/Graph/%s_%s_%s_w%s_t%s_BW' %(subject,sequence,roi,w,thres)
-	np.save(fn, BW)	
 
 if __name__ == "__main__":
 
 	subject, sequence, roi, w = raw_input().split()
-	run_d_graph(subject, sequence, roi, w)
-	run_impose_graph(subject, sequence, roi, w)
-	run_thres_graph(subject, sequence, roi, w)
-	run_impose_thres_graph(subject, sequence, roi, w)
-
-
+	
+	run_d_graph(subject, sequence, roi, w, thresh = 1, imp = False, part = False)
+	run_d_graph(subject, sequence, roi, w, thresh = 1, imp = True, part = False)
+	run_d_graph(subject, sequence, roi, w, thresh = 1, imp = True, part = True)
+	run_d_graph(subject, sequence, roi, w, thresh = 1, imp = False, part = True)
+	run_d_graph(subject, sequence, roi, w, thresh = .1, imp = False, part = False)
+	run_d_graph(subject, sequence, roi, w, thresh = .1, imp = True, part = False)
+	run_d_graph(subject, sequence, roi, w, thresh = .1, imp = True, part = True)
+	run_d_graph(subject, sequence, roi, w, thresh = .1, imp = False, part = True)
 
 
 
