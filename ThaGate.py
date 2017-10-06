@@ -1,4 +1,4 @@
-from FuncParcel import *
+xfrom FuncParcel import *
 import numpy as np
 import nibabel as nib
 import pandas as pd
@@ -24,7 +24,8 @@ def map_target():
 	# MaxYeo17_Morel_pM = np.argmax(Morel_Yeo17_pM[17:,0:17],1)+1
 
 
-	Morel_Yeo400_M = average_corrmat('/home/despoB/connectome-thalamus/ThaGate/Matrices/NKI*_Morel_plus_Yeo400_1400_corrmat', np_txt=True, pickle_object=False)
+	#Morel_Yeo400_M = average_corrmat('/home/despoB/connectome-thalamus/ThaGate/Matrices/NKI*_Morel_plus_Yeo400_1400_corrmat', np_txt=True, pickle_object=False)
+	Morel_Yeo400_M = average_corrmat('/home/despoB/connectome-thalamus/ThaGate/Matrices/*_Morel_plus_Yeo400_1400_pcorr_mat', np_txt=True, pickle_object=False)
 	np.fill_diagonal(Morel_Yeo400_M, 0)
 	Morel_Yeo400_M[np.isnan(Morel_Yeo400_M)] = 0
 	M = Morel_Yeo400_M[400:,0:400]
@@ -37,14 +38,17 @@ def map_indiv_target(subj, seq, dset):
 	''' feed in individual matrix and find cortical targets for each thalamic nuclei'''
 	
 	if dset == 'NKI':
-		fn = '/home/despoB/connectome-thalamus/ThaGate/Matrices/%s_%s_Morel_plus_Yeo400_%s_corrmat' %(dset, subj, seq)
+		#fn = '/home/despoB/connectome-thalamus/ThaGate/Matrices/%s_%s_Morel_plus_Yeo400_%s_corrmat' %(dset, subj, seq)
+		fn = '/home/despoB/connectome-thalamus/ThaGate/Matrices/%s_Morel_plus_Yeo400_%s_pcorr_mat' %(subj, seq)
 		M = np.loadtxt(fn)
 		
 	
 	if dset == 'HCP':
-		fn = '/home/despoB/connectome-thalamus/ThaGate/Matrices/%s_%s_Morel_plus_Yeo400_%s_corrmat' %(dset, subj, 'rfMRI_REST2_RL')	
+		#fn = '/home/despoB/connectome-thalamus/ThaGate/Matrices/%s_%s_Morel_plus_Yeo400_%s_corrmat' %(dset, subj, 'rfMRI_REST2_RL')
+		fn = '/home/despoB/connectome-thalamus/ThaGate/Matrices/%s_Morel_plus_Yeo400_%s_pcorr_mat' %(subj, 'rfMRI_REST2_RL')	
 		M1 = np.loadtxt(fn)
-		fn = '/home/despoB/connectome-thalamus/ThaGate/Matrices/%s_%s_Morel_plus_Yeo400_%s_corrmat' %(dset, subj, 'rfMRI_REST2_LR')
+		#fn = '/home/despoB/connectome-thalamus/ThaGate/Matrices/%s_%s_Morel_plus_Yeo400_%s_corrmat' %(dset, subj, 'rfMRI_REST2_LR')
+		fn = '/home/despoB/connectome-thalamus/ThaGate/Matrices/%s_Morel_plus_Yeo400_%s_pcorr_mat' %(subj, 'rfMRI_REST2_LR')
 		M2 = np.loadtxt(fn)
 		M = (M1 + M2)/2
 
