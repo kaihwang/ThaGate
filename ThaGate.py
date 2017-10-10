@@ -1,4 +1,4 @@
-xfrom FuncParcel import *
+from FuncParcel import *
 import numpy as np
 import nibabel as nib
 import pandas as pd
@@ -60,23 +60,14 @@ def map_indiv_target(subj, seq, dset):
 	return Max, Min
 
 
-def load_graph_metric(subj, seq, window, measure, impose = False, thresh = False):
+def load_graph_metric(subj, seq, window, measure, impose = True, thresh = 0.1, partial = False):
 	'''shorthand to load graph metric'''
-	fn = '/home/despoB/connectome-thalamus/ThaGate/Graph/' + subj + '_' + str(seq) + '_' +'Morel_plus_Yeo400' + '_w' + str(window) + '_' + measure + '.npy'
 	
-	if impose:
-		fn = '/home/despoB/connectome-thalamus/ThaGate/Graph/' + subj + '_' + str(seq) + '_' +'Morel_plus_Yeo400' + '_w' + str(window) + '_impose_' + measure + '.npy'
-
-		if thresh:
-			fn = '/home/despoB/connectome-thalamus/ThaGate/Graph/' + subj + '_' + str(seq) + '_' +'Morel_plus_Yeo400' + '_w' + str(window) + '_impose_t0.1_' + measure + '.npy'
-	
-	if thresh:
-		fn = '/home/despoB/connectome-thalamus/ThaGate/Graph/' + subj + '_' + str(seq) + '_' +'Morel_plus_Yeo400' + '_w' + str(window) + '_t0.1_' + measure + '.npy'
-	
+	fn = '/home/despoB/connectome-thalamus/ThaGate/Graph/%s_%s_Morel_plus_Yeo400_w%s_impose%s_t%s_partial%s_%s.npy' %(subj, seq, window, impose, thresh, partial, measure)
 	y = np.load(fn)
 
-	if measure == 'phis':  #maxwell's calculation on club coeff transposed matrices
-		y = y.T 		   #the dimension should be ROI by time
+	#if measure == 'phis':  #maxwell's calculation on club coeff transposed matrices
+	#	y = y.T 		   #the dimension should be ROI by time
 
 	return y
 
@@ -134,7 +125,7 @@ def cortical_graph(Subjects, seq, measures, HCP = True, impose = True):
 		df = pd.concat([df, sdf])		
 	return df	
 
-def run_regmodel(Subjects, seq, window, measures, HCP = False, IndivTarget = False, MTD = False, impose = False, nodeselection = np.nan, thresh = False, saveobj = False):
+def run_regmodel(Subjects, seq, window, measures, HCP = False, IndivTarget = True, MTD = False, impose = False, nodeselection = np.nan, thresh = 0.1, saveobj = False):
 	''' wraper script to test thalamic acitivty's effect on global network properties
 	if calculating global metrics (eg, q, avePC), then set nodeselection = np.nan. 
 	if using MTD between neuclei and cortical targets as predictors, set MTD = True'''
@@ -317,92 +308,49 @@ if __name__ == "__main__":
 	#window = 16	
 	measures = ['PC', 'WMD', 'WW', 'BW', 'q']
 	
-	#### test thalamic correlations with these global topological measures: ['PC', 'WMD', 'WW', 'BW', 'q', 'phis']
-	#Global_df = run_regmodel(Subjects, seq, window, measures)
-	#Global_df.to_csv('Data/Global_df.csv')
+	#### test thalamocortical correlations with these global topological measures: ['PC', 'WMD', 'WW', 'BW', 'q', 'phis']
+	#seq = 'rfMRI_REST1'
+	#window =15
+	#Global_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True)
+	#Global_df.to_csv('Data/HCP_Global_df.csv')
 
 	#### test nodal variables
 	#get cortical ROI targets of each thalamic nuclei from morel atlas
-	#MaxYeo400_Morel, MinYeo400_Morel, Morel_Yeo400_M = map_target()
+	MaxYeo400_Morel, MinYeo400_Morel, Morel_Yeo400_M = map_target()
 	#np.save('Data/MaxYeo400_Morel', MaxYeo400_Morel)
 	#np.save('Data/MinYeo400_Morel', MinYeo400_Morel)
 	#np.save('Data/Morel_Yeo400_M', Morel_Yeo400_M)
-	MaxYeo400_Morel = np.load('Data/MaxYeo400_Morel.npy')
-	
-	###Past Explorations of regression models
-	#Target_Node_Impose_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = False, impose = True, nodeselection = MaxYeo400_Morel)
-	#Target_Node_Impose_df.to_csv('Data/Target_Node_Impose_df.csv')
-
-	#Target_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = False, impose = False, nodeselection = MaxYeo400_Morel)
-	#Target_Node_df.to_csv('Data/Target_Node_df.csv')
-
-	#Target_MTD_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = False, MTD = True, impose = False, nodeselection = MaxYeo400_Morel)
-	#Target_MTD_Node_df.to_csv('Data/Target_MTD_Node_df.csv')
-
-	#IndivTarget_MTD_Impose_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = True, MTD = True, impose = True)
-	#IndivTarget_MTD_Impose_Node_df.to_csv('Data/IndivTarget_MTD_Impose_Node_df.csv')
-
-	#IndivTarget_MTD_Node_df = run_regmodel(Subjects, seq, window, measures, IndivTarget = True, MTD = True, impose = False)
-	#IndivTarget_MTD_Node_df.to_csv('Data/IndivTarget_MTD_Node_df.csv')
-	
+	#MaxYeo400_Morel = np.load('Data/MaxYeo400_Morel.npy')
+		
 
 	### Do Rest, NKI
-	#seq = 645
-	#window = 16
-	#NKI_Target_MTD_Node_Impose_df = run_regmodel(NKISubjects, seq, window, measures, HCP = False, IndivTarget = False, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
-	#NKI_Target_MTD_Node_Impose_df.to_csv('Data/NKI_Target_MTD_Node_Impose_df.csv')
+	seq = 645
+	window = 16
+	NKI_grpTarget_MTD_th_noImpose_df = run_regmodel(NKISubjects, seq, window, measures, HCP = False, IndivTarget = False, MTD = True, impose = False, nodeselection = MaxYeo400_Morel)
+	NKI_grpTarget_MTD_th_noImpose_df.to_csv('Data/NKI_grpTarget_MTD_th_noImpose_df.csv')
+	#NKI_grpTarget_MTD_th_noImpose_Partial_df = run_regmodel(NKISubjects, seq, window, measures, HCP = False, IndivTarget = False, MTD = True, impose = False, nodeselection = MaxYeo400_Morel)
+	#NKI_grpTarget_MTD_th_noImpose_Partial_df.to_csv('Data/NKI_grpTarget_MTD_th_noImpose_Partial_df.csv')
 
 	### Replicate Rest, HCP
 	seq = 'rfMRI_REST1'
 	window =15
-	
-	HCP_Rest_Cortical_Graph_df = cortical_graph(HCPSubjects, seq, measures, HCP = True, impose = True)
-	HCP_Rest_Cortical_Graph_df.to_csv('Data/HCP_Rest_Cortical_Graph_df.csv')
 
-	HCP_Rest_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = True, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
-	HCP_Rest_Target_MTD_Node_df.to_csv('Data/HCP_Rest_indvTarget_MTD_Node_Impose_df.csv')
-	HCP_Rest_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
-	HCP_Rest_Target_MTD_Node_df.to_csv('Data/HCP_Rest_MTD_Node_Impose_df.csv')
-	HCP_Rest_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, nodeselection = MaxYeo400_Morel)
-	HCP_Rest_Target_MTD_Node_df.to_csv('Data/HCP_Rest_MTD_Node_df.csv')
-	HCP_Rest_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, nodeselection = MaxYeo400_Morel, thresh = True)
-	HCP_Rest_Target_MTD_Node_df.to_csv('Data/HCP_Rest_MTD_Node_thresh_df.csv')
-	HCP_Rest_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = True, nodeselection = MaxYeo400_Morel, thresh = True)
-	HCP_Rest_Target_MTD_Node_df.to_csv('Data/HCP_Rest_MTD_Node_Impose_thresh_df.csv')
-	
+	HCP_Rest_grpTarget_MTD_th_noImpose_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, nodeselection = MaxYeo400_Morel)
+	HCP_Rest_grpTarget_MTD_th_noImpose_df.to_csv('Data/HCP_Rest_grpTarget_MTD_th_Inompose_df.csv')
+	#HCP_Rest_grpTarget_MTD_th_noImpose_Partial_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, nodeselection = MaxYeo400_Morel)
+	#HCP_Rest_grpTarget_MTD_th_noImpose_Partial_df.to_csv('Data/HCP_Rest_grpTarget_MTD_th_Inompose_Partial_df.csv')
 
 	### Do HCP tasks
 	seq = 'WM'
 	window =15
-	HCP_WM_Cortical_Graph_df = cortical_graph(HCPSubjects, seq, measures, HCP = True, impose = True)
-	HCP_WM_Cortical_Graph_df.to_csv('Data/HCP_WM_Cortical_Graph_df.csv')
+	#HCP_WM_grpTarget_MTD_th_Impose_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
+	#HCP_WM_grpTarget_MTD_th_Impose_df.to_csv('Data/HCP_WM_grpTarget_MTD_th_Impose_df.csv')
 
-	HCP_WM_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = True, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
-	HCP_WM_Target_MTD_Node_df.to_csv('Data/HCP_WM_indvTarget_MTD_Node_Impose_df.csv')
-	HCP_WM_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
-	HCP_WM_Target_MTD_Node_df.to_csv('Data/HCP_WM_MTD_Node_Impose_df.csv')
-	HCP_WM_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, nodeselection = MaxYeo400_Morel)
-	HCP_WM_Target_MTD_Node_df.to_csv('Data/HCP_WM_MTD_Node_df.csv')
-	HCP_WM_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, nodeselection = MaxYeo400_Morel, thresh = True)
-	HCP_WM_Target_MTD_Node_df.to_csv('Data/HCP_WM_MTD_Node_thresh_df.csv')
-	HCP_WM_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = True, nodeselection = MaxYeo400_Morel, thresh = True)
-	HCP_WM_Target_MTD_Node_df.to_csv('Data/HCP_WM_MTD_Node_Impose_thresh_df.csv')
 
 	seq = 'MOTOR'
 	window =15
-	HCP_MOTOR_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = True, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
-	HCP_MOTOR_Target_MTD_Node_df.to_csv('Data/HCP_MOTOR_indvTarget_MTD_Node_Impose_df.csv')
-	HCP_MOTOR_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
-	HCP_MOTOR_Target_MTD_Node_df.to_csv('Data/HCP_MOTOR_MTD_Node_Impose_df.csv')
-	HCP_MOTOR_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, nodeselection = MaxYeo400_Morel)
-	HCP_MOTOR_Target_MTD_Node_df.to_csv('Data/HCP_MOTOR_MTD_Node_df.csv')
-	HCP_MOTOR_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, nodeselection = MaxYeo400_Morel, thresh = True)
-	HCP_MOTOR_Target_MTD_Node_df.to_csv('Data/HCP_MOTOR_MTD_Node_thresh_df.csv')
-	HCP_MOTOR_Target_MTD_Node_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = True, nodeselection = MaxYeo400_Morel, thresh = True)
-	HCP_MOTOR_Target_MTD_Node_df.to_csv('Data/HCP_MOTOR_MTD_Node_Impose_thresh_df.csv')
-
-	HCP_MOTOR_Cortical_Graph_df = cortical_graph(HCPSubjects, seq, measures, HCP = True, impose = True)
-	HCP_MOTOR_Cortical_Graph_df.to_csv('Data/HCP_MOTOR_Cortical_Graph_df.csv')
+	HCP_MOTOR_grpTarget_MTD_th_Impose_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
+	HCP_MOTOR_grpTarget_MTD_th_Impose_df.to_csv('Data/HCP_MOTOR_grpTarget_MTD_th_Impose_df.csv')
 
 
 
