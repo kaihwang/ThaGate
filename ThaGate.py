@@ -317,7 +317,7 @@ if __name__ == "__main__":
 	#### test nodal variables
 	#get cortical ROI targets of each thalamic nuclei from morel atlas
 	MaxYeo400_Morel, MinYeo400_Morel, Morel_Yeo400_M = map_target()
-	#np.save('Data/MaxYeo400_Morel', MaxYeo400_Morel)
+	np.save('Data/MaxYeo400_MorelPar', MaxYeo400_Morel)
 	#np.save('Data/MinYeo400_Morel', MinYeo400_Morel)
 	#np.save('Data/Morel_Yeo400_M', Morel_Yeo400_M)
 	#MaxYeo400_Morel = np.load('Data/MaxYeo400_Morel.npy')
@@ -326,31 +326,31 @@ if __name__ == "__main__":
 	### Do Rest, NKI
 	seq = 645
 	window = 16
-	NKI_grpTarget_MTD_th_noImpose_df = run_regmodel(NKISubjects, seq, window, measures, HCP = False, IndivTarget = False, MTD = True, impose = False, nodeselection = MaxYeo400_Morel)
-	NKI_grpTarget_MTD_th_noImpose_df.to_csv('Data/NKI_grpTarget_MTD_th_noImpose_df.csv')
-	#NKI_grpTarget_MTD_th_noImpose_Partial_df = run_regmodel(NKISubjects, seq, window, measures, HCP = False, IndivTarget = False, MTD = True, impose = False, nodeselection = MaxYeo400_Morel)
-	#NKI_grpTarget_MTD_th_noImpose_Partial_df.to_csv('Data/NKI_grpTarget_MTD_th_noImpose_Partial_df.csv')
+	#NKI_grpTarget_MTD_th_noImpose_df = run_regmodel(NKISubjects, seq, window, measures, HCP = False, IndivTarget = False, MTD = True, impose = False, nodeselection = MaxYeo400_Morel)
+	#NKI_grpTarget_MTD_th_noImpose_df.to_csv('Data/NKI_grpTarget_MTD_th_noImpose_df.csv')
+	NKI_grpTarget_MTD_th_noImpose_Partial_df = run_regmodel(NKISubjects, seq, window, measures, HCP = False, IndivTarget = False, MTD = True, impose = False, part = False, nodeselection = MaxYeo400_Morel)
+	NKI_grpTarget_MTD_th_noImpose_Partial_df.to_csv('Data/NKI_grpTarget_MTD_th_noImpose_Partial_df.csv')
 
 	### Replicate Rest, HCP
 	seq = 'rfMRI_REST1'
 	window =15
 
-	HCP_Rest_grpTarget_MTD_th_noImpose_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, nodeselection = MaxYeo400_Morel)
-	HCP_Rest_grpTarget_MTD_th_noImpose_df.to_csv('Data/HCP_Rest_grpTarget_MTD_th_Inompose_df.csv')
-	#HCP_Rest_grpTarget_MTD_th_noImpose_Partial_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, nodeselection = MaxYeo400_Morel)
-	#HCP_Rest_grpTarget_MTD_th_noImpose_Partial_df.to_csv('Data/HCP_Rest_grpTarget_MTD_th_Inompose_Partial_df.csv')
+	#HCP_Rest_grpTarget_MTD_th_noImpose_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, nodeselection = MaxYeo400_Morel)
+	#HCP_Rest_grpTarget_MTD_th_noImpose_df.to_csv('Data/HCP_Rest_grpTarget_MTD_th_Inompose_df.csv')
+	HCP_Rest_grpTarget_MTD_th_noImpose_Partial_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, part = False, nodeselection = MaxYeo400_Morel)
+	HCP_Rest_grpTarget_MTD_th_noImpose_Partial_df.to_csv('Data/HCP_Rest_grpTarget_MTD_th_noImpose_Partial_df.csv')
 
 	### Do HCP tasks
 	seq = 'WM'
 	window =15
-	#HCP_WM_grpTarget_MTD_th_Impose_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
-	#HCP_WM_grpTarget_MTD_th_Impose_df.to_csv('Data/HCP_WM_grpTarget_MTD_th_Impose_df.csv')
+	HCP_WM_grpTarget_MTD_th_noImpose_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, part = False, nodeselection = MaxYeo400_Morel)
+	HCP_WM_grpTarget_MTD_th_noImpose_df.to_csv('Data/HCP_WM_grpTarget_MTD_th_noImpose_df.csv')
 
 
 	seq = 'MOTOR'
 	window =15
-	HCP_MOTOR_grpTarget_MTD_th_Impose_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = True, nodeselection = MaxYeo400_Morel)
-	HCP_MOTOR_grpTarget_MTD_th_Impose_df.to_csv('Data/HCP_MOTOR_grpTarget_MTD_th_Impose_df.csv')
+	HCP_MOTOR_grpTarget_MTD_th_noImpose_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, part = False, nodeselection = MaxYeo400_Morel)
+	HCP_MOTOR_grpTarget_MTD_th_noImpose_df.to_csv('Data/HCP_MOTOR_grpTarget_MTD_th_nompose_df.csv')
 
 
 
