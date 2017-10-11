@@ -125,7 +125,7 @@ def cortical_graph(Subjects, seq, measures, HCP = True, impose = True):
 		df = pd.concat([df, sdf])		
 	return df	
 
-def run_regmodel(Subjects, seq, window, measures, HCP = False, IndivTarget = True, MTD = False, impose = False, nodeselection = np.nan, thresh = 0.1, saveobj = False):
+def run_regmodel(Subjects, seq, window, measures, HCP = False, IndivTarget = True, MTD = False, impose = False, part = False, nodeselection = np.nan, thresh = 0.1, saveobj = False):
 	''' wraper script to test thalamic acitivty's effect on global network properties
 	if calculating global metrics (eg, q, avePC), then set nodeselection = np.nan. 
 	if using MTD between neuclei and cortical targets as predictors, set MTD = True'''
@@ -150,14 +150,14 @@ def run_regmodel(Subjects, seq, window, measures, HCP = False, IndivTarget = Tru
 
 			if impose == False:
 				if not HCP:
-					y = load_graph_metric(subj, seq, window, measure, impose = False, thresh = thresh)
+					y = load_graph_metric(subj, seq, window, measure, impose = False, thresh = thresh, partial = part)
 				else:
-					y = np.hstack((load_graph_metric(subj, seq1, window, measure, impose = False, thresh = thresh), load_graph_metric(subj, seq2, window, measure, impose = False, thresh = thresh)))
+					y = np.hstack((load_graph_metric(subj, seq1, window, measure, impose = False, thresh = thresh, partial = part), load_graph_metric(subj, seq2, window, measure, impose = False, thresh = thresh, partial = part)))
 			if impose == True:
 				if not HCP:
-					y = load_graph_metric(subj, seq, window, measure, impose = True, thresh = thresh)
+					y = load_graph_metric(subj, seq, window, measure, impose = True, thresh = thresh, partial = part)
 				else:
-					y = np.hstack((load_graph_metric(subj, seq1, window, measure, impose = True, thresh = thresh), load_graph_metric(subj, seq2, window, measure, impose = True, thresh = thresh)))
+					y = np.hstack((load_graph_metric(subj, seq1, window, measure, impose = True, thresh = thresh, partial = part), load_graph_metric(subj, seq2, window, measure, impose = True, thresh = thresh, partial = part)))
 
 			#set it to nan for cal global metrics, average across nodes
 			if np.isnan(nodeselection).all(): 
