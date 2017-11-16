@@ -1,5 +1,7 @@
 # ThaGate
 
+By predict, I mean in a regression kind of a way. So it is not true prediction. I know. 
+
 Gate? What Gate???
 
 Follow up on graph analysis of thalamocortical connectivity.
