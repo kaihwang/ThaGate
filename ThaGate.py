@@ -125,8 +125,8 @@ def cortical_graph(Subjects, seq, measures, HCP = True, impose = True):
 		df = pd.concat([df, sdf])		
 	return df	
 
-def run_regmodel(Subjects, seq, window, measures, HCP = False, IndivTarget = True, MTD = False, impose = False, part = False, nodeselection = np.nan, thresh = 0.1, saveobj = False):
-	''' wraper script to test thalamic acitivty's effect on global network properties
+def run_regmodel(Subjects, seq, window, measures, HCP = False, IndivTarget = True, MTD = False, impose = False, part = False, nodeselection = np.nan, thresh = 1, saveobj = False):
+	''' wrapper script to test thalamic acitivty's or thalamocortical connectivity's effect on  network properties
 	if calculating global metrics (eg, q, avePC), then set nodeselection = np.nan. 
 	if using MTD between neuclei and cortical targets as predictors, set MTD = True'''
 	
@@ -202,10 +202,10 @@ def run_regmodel(Subjects, seq, window, measures, HCP = False, IndivTarget = Tru
 					sma = coupling(ts[:,i],window)[1]
 					# ave coupling score for each thalamic nuclei and beweten its cortical targets
 					x = np.squeeze(np.nanmean(sma[:,len(i)-1:,][:,:,0:len(i)-1], axis=2)) #len(i)-1 is to determine number of cortical targets included (minus 15 thalamic nuclei)
-					try:
-						est = fit_linear_model(y,x)
-					except:
-						pass
+					#try:
+					est = fit_linear_model(y,x)
+					#except:
+					#	pass
 
 				if MTD == False:	
 					est = fit_linear_model(y,x[:,j])
@@ -293,8 +293,78 @@ def visualize_parcellation(CIs, cmap):
    # plt.savefig(savepath, bbox_inches='tight')
 
 
+def consolidate_HCP_task_graph(Subjects, seq = 'WM'):
+	'''function to compile task graph metrics into df'''
+	df = pd.DataFrame(columns=('Subject', 'ROI', 'PC', 'WMD', 'WW', 'BW')) 
+
+	measures = ['PC', 'WMD', 'WW', 'BW']
+
+	for subj in Subjects:
+		pdf = pd.DataFrame(columns=('Subject', 'ROI', 'PC', 'WMD', 'WW', 'BW')) 
+		
+		for measure in measures:
+			seq1 = seq +'_LR'
+			seq2 = seq +'_RL'
+			window =15
+			y = np.hstack((load_graph_metric(subj, seq1, window, measure, impose = False, thresh = 1, partial = True), load_graph_metric(subj, seq2, window, measure, impose = False, thresh = 1, partial = True)))
+			pdf[measure] = np.nanmean(y, axis=1)
+
+		pdf['Subject'] = subj
+		pdf['ROI'] = range(y.shape[0])
+		df = pd.concat([df, pdf])	
+	return df
+
+
+def consolidate_task_graph(Subjects, seq = 'WM'):
+	'''function to compile task graph metrics into df'''
+	df = pd.DataFrame(columns=('Subject', 'ROI', 'PC', 'WMD', 'WW', 'BW')) 
+
+	measures = ['PC', 'WMD', 'WW', 'BW']
+
+	for subj in Subjects:
+		pdf = pd.DataFrame(columns=('Subject', 'ROI', 'PC', 'WMD', 'WW', 'BW')) 
+		
+		for measure in measures:
+			window =10
+			thresh = 1
+			y = load_graph_metric(subj, seq, window, measure, impose = False, thresh = thresh, partial = False)
+			pdf[measure] = np.nanmean(y, axis=1)
+
+		pdf['Subject'] = subj
+		pdf['ROI'] = range(y.shape[0])
+		df = pd.concat([df, pdf])	
+	return df
+
+
+
+def run_regmodel_corticothalamo(Subjects, seq, window, measures, HCP = False, IndivTarget = True, MTD = False, impose = False, part = False, nodeselection = np.nan, thresh = 1, saveobj = False):
+	''' wrapper script to test thalamic acitivty's or thalamocortical connectivity's effect on network properties
+	The difference for this version is that instead of finding cortical targets for each thalamic nuclei, it will preselect cortical regions and include all nuclei in the nuclei'''
+
+	df = pd.DataFrame(columns=('Subject', 'Thalamic Nuclei', 'PC', 'WMD', 'WW', 'BW', 'q', 'phis')) 
+ 	Nuclei = ['AN','VM', 'VL', 'MGN', 'MD', 'PuA', 'LP', 'IL', 'VA', 'Po', 'LGN', 'PuM', 'PuI', 'PuL', 'VP']
+	
+	#loop through subjects
+	for i, subj in enumerate(Subjects):
+		
+		#create subject dataframe
+		sdf = pd.DataFrame(columns=('Subject', 'Thalamic Nuclei', 'PC', 'WMD', 'WW', 'BW', 'q', 'phis')) 
+		sdf['Thalamic Nuclei'] = Nuclei
+		sdf['Subject'] = subj
+
+		#two runs for HCP
+		if HCP:
+			seq1 = seq+'_LR'
+			seq2 = seq+'_RL'
+
+	
+
+
+
 if __name__ == "__main__":
 
+	########################
+	######## Do NKI and HCP
 
 	#get list of NKI subjects
 	with open("/home/despoB/kaihwang/bin/ThaGate/NKI_subjlist") as f:
@@ -303,54 +373,74 @@ if __name__ == "__main__":
 	with open("/home/despoB/kaihwang/bin/ThaGate/HCP_subjlist") as f:
 		HCPSubjects = [line.rstrip() for line in f]
 		
-	##global variables
-	#for now use TR645	
-	#window = 16	
 	measures = ['PC', 'WMD', 'WW', 'BW', 'q']
 	
-	#### test thalamocortical correlations with these global topological measures: ['PC', 'WMD', 'WW', 'BW', 'q', 'phis']
-	#seq = 'rfMRI_REST1'
-	#window =15
-	#Global_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True)
-	#Global_df.to_csv('Data/HCP_Global_df.csv')
-
 	#### test nodal variables
 	#get cortical ROI targets of each thalamic nuclei from morel atlas
-	MaxYeo400_Morel, MinYeo400_Morel, Morel_Yeo400_M = map_target()
-	np.save('Data/MaxYeo400_MorelPar', MaxYeo400_Morel)
+	#MaxYeo400_Morel, MinYeo400_Morel, Morel_Yeo400_M = map_target()
+	#np.save('Data/MaxYeo400_MorelPar', MaxYeo400_Morel)
 	#np.save('Data/MinYeo400_Morel', MinYeo400_Morel)
 	#np.save('Data/Morel_Yeo400_M', Morel_Yeo400_M)
-	#MaxYeo400_Morel = np.load('Data/MaxYeo400_Morel.npy')
-		
+	MaxYeo400_Morel = np.load('Data/MaxYeo400_Morel.npy')
+	
+	#test cortical target 152
+	#ctarget=np.tile([151, 363, 111, 367, 153, 105,  74, 161, 368, 154, 160, 362,  87,
+    #   150, 357, 156, 169, 387, 239],(15,1))	
 
 	### Do Rest, NKI
-	seq = 645
-	window = 16
-	#NKI_grpTarget_MTD_th_noImpose_df = run_regmodel(NKISubjects, seq, window, measures, HCP = False, IndivTarget = False, MTD = True, impose = False, nodeselection = MaxYeo400_Morel)
-	#NKI_grpTarget_MTD_th_noImpose_df.to_csv('Data/NKI_grpTarget_MTD_th_noImpose_df.csv')
-	NKI_grpTarget_MTD_th_noImpose_Partial_df = run_regmodel(NKISubjects, seq, window, measures, HCP = False, IndivTarget = False, MTD = True, impose = False, part = False, nodeselection = MaxYeo400_Morel)
-	NKI_grpTarget_MTD_th_noImpose_Partial_df.to_csv('Data/NKI_grpTarget_MTD_th_noImpose_Partial_df.csv')
+	#seq = 645
+	#window = 16
+	#NKI_grpTarget_MTD_noImpose_Partial_df = run_regmodel(NKISubjects, seq, window, measures, HCP = False, IndivTarget = False, MTD = True, impose = False, part = False, nodeselection = MaxYeo400_Morel)
+	#NKI_grpTarget_MTD_noImpose_Partial_df.to_csv('Data/NKI_grpTarget_MTD_noImpose_Partial_df.csv')
 
 	### Replicate Rest, HCP
-	seq = 'rfMRI_REST1'
-	window =15
+	#seq = 'rfMRI_REST1'
+	#window =15
 
-	#HCP_Rest_grpTarget_MTD_th_noImpose_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, nodeselection = MaxYeo400_Morel)
-	#HCP_Rest_grpTarget_MTD_th_noImpose_df.to_csv('Data/HCP_Rest_grpTarget_MTD_th_Inompose_df.csv')
-	HCP_Rest_grpTarget_MTD_th_noImpose_Partial_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, part = False, nodeselection = MaxYeo400_Morel)
-	HCP_Rest_grpTarget_MTD_th_noImpose_Partial_df.to_csv('Data/HCP_Rest_grpTarget_MTD_th_noImpose_Partial_df.csv')
+	#HCP_Rest_grpTarget_MTD_noImpose_Partial_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, part = False, nodeselection = MaxYeo400_Morel)
+	#HCP_Rest_grpTarget_MTD_noImpose_Partial_df.to_csv('Data/HCP_Rest_grpTarget_MTD_noImpose_Partial_df.csv')
 
 	### Do HCP tasks
-	seq = 'WM'
-	window =15
-	HCP_WM_grpTarget_MTD_th_noImpose_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, part = False, nodeselection = MaxYeo400_Morel)
-	HCP_WM_grpTarget_MTD_th_noImpose_df.to_csv('Data/HCP_WM_grpTarget_MTD_th_noImpose_df.csv')
+	#seq = 'WM'
+	#window =15
+	#HCP_WM_grpTarget_MTD_noImpose_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, part = False, nodeselection = MaxYeo400_Morel)
+	#HCP_WM_grpTarget_MTD_noImpose_df.to_csv('Data/HCP_WM_grpTarget_MTD_noImpose_df.csv')
+	#HCP_WM_PCTarget_MTD_noImpose_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, part = False, nodeselection = ctarget)
+	#HCP_WM_PCTarget_MTD_noImpose_df.to_csv('Data/HCP_WM_PCTarget_MTD_noImpose_df.csv')
+
+	#seq = 'MOTOR'
+	#window =15
+	#HCP_MOTOR_grpTarget_MTD_noImpose_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, part = False, nodeselection = MaxYeo400_Morel)
+	#HCP_MOTOR_grpTarget_MTD_noImpose_df.to_csv('Data/HCP_MOTOR_grpTarget_MTD_nompose_df.csv')
 
 
-	seq = 'MOTOR'
-	window =15
-	HCP_MOTOR_grpTarget_MTD_th_noImpose_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, part = False, nodeselection = MaxYeo400_Morel)
-	HCP_MOTOR_grpTarget_MTD_th_noImpose_df.to_csv('Data/HCP_MOTOR_grpTarget_MTD_th_nompose_df.csv')
+	########################
+	######## Do TRSE and TDSigEI
+
+
+	with open("/home/despoB/kaihwang/bin/ThaMTD/Data/TRSE_subject") as f:
+		TRSESubjects = [line.rstrip() for line in f]
+	
+	with open("/home/despoB/kaihwang/bin/ThaMTD/Data/TDSigEI_subject") as f:
+		TDSigEISubjects = [line.rstrip() for line in f]
+		
+	measures = ['PC', 'WMD', 'WW', 'BW', 'q']
+
+
+	#### get task diff in graph
+	df={}
+	for seq in ['HF', 'FH', 'Fp', 'Hp']:
+		df[seq] =consolidate_task_graph(TDSigEISubjects, seq = seq)
+
+	### TRSE
+	# window =10
+	# for seq in ['HF', 'FH', 'Fp', 'Hp', 'Fo', 'Ho']:
+	# 	df = run_regmodel(TDSigEISubjects, seq, window, measures, HCP = False, IndivTarget = False, MTD = True, impose = False, part = False, nodeselection = MaxYeo400_Morel)
+	# 	fn = 'Data/TDSigEI_%s.csv' %seq
+	# 	df.to_csv(fn)
+
+
+
 
 
 
