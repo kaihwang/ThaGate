@@ -20,14 +20,14 @@ SCRIPT='/home/despoB/kaihwang/bin/ThaGate'
 
 
 #TDSigEI
-# cd /home/despoB/kaihwang/TRSE/TDSigEI
-# for s in $(/bin/ls -d 5*); do  #$(/bin/ls -d *)
-# 	#if [ ! -e "/home/despoB/kaihwang/Rest/Graph/gsetCI_${Subject}.mat" ]; then
-# 	sed "s/s in 503/s in ${s}/g" < ${SCRIPT}/python_qsub.sh > ~/tmp/${s}.sh
-# 	echo "bash ~/tmp/${s}.sh TDSigEI" > ~/tmp/dFC_graph${s}.sh
-# 	qsub -l mem_free=5G -V -M kaihwang -m e -e ~/tmp -o ~/tmp ~/tmp/dFC_graph${s}.sh
-# 	#fi
-# done
+cd /home/despoB/kaihwang/TRSE/TDSigEI
+for s in $(/bin/ls -d 5*); do  #$(/bin/ls -d *)
+	#if [ ! -e "/home/despoB/kaihwang/Rest/Graph/gsetCI_${Subject}.mat" ]; then
+	sed "s/s in 503/s in ${s}/g" < ${SCRIPT}/python_qsub.sh > ~/tmp/${s}.sh
+	echo "bash ~/tmp/${s}.sh TDSigEI" > ~/tmp/dFC_graph${s}.sh
+	qsub -l mem_free=5G -V -M kaihwang -m e -e ~/tmp -o ~/tmp ~/tmp/dFC_graph${s}.sh
+	#fi
+done
 
 
 

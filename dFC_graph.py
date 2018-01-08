@@ -144,7 +144,7 @@ def cal_between_weight(matrix, ci):
 	return BW
 
 
-def run_d_graph(subject, sequence, roi, w, thresh, imp = True, part = True):
+def run_d_graph(subject, sequence, roi, w, thresh, imp = True, part = False):
 	''' to loop through dynamic graph script
 	if need to threshold matrices, set thresh
 	imp is to decide whether to impose group template
@@ -178,13 +178,7 @@ if __name__ == "__main__":
 	subject, sequence, roi, w = raw_input().split()
 	
 	run_d_graph(subject, sequence, roi, w, thresh = 1, imp = False, part = False)
-	run_d_graph(subject, sequence, roi, w, thresh = 1, imp = True, part = False)
-	run_d_graph(subject, sequence, roi, w, thresh = 1, imp = True, part = True)
-	run_d_graph(subject, sequence, roi, w, thresh = 1, imp = False, part = True)
 	run_d_graph(subject, sequence, roi, w, thresh = .1, imp = False, part = False)
-	run_d_graph(subject, sequence, roi, w, thresh = .1, imp = True, part = False)
-	run_d_graph(subject, sequence, roi, w, thresh = .1, imp = True, part = True)
-	run_d_graph(subject, sequence, roi, w, thresh = .1, imp = False, part = True)
 
 
 
