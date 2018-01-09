@@ -25,7 +25,7 @@ for s in $(/bin/ls -d 5*); do  #$(/bin/ls -d *)
 	#if [ ! -e "/home/despoB/kaihwang/Rest/Graph/gsetCI_${Subject}.mat" ]; then
 	sed "s/s in 503/s in ${s}/g" < ${SCRIPT}/python_qsub.sh > ~/tmp/${s}.sh
 	echo "bash ~/tmp/${s}.sh TDSigEI" > ~/tmp/dFC_graph${s}.sh
-	qsub -l mem_free=5G -V -M kaihwang -m e -e ~/tmp -o ~/tmp ~/tmp/dFC_graph${s}.sh
+	qsub -l mem_free=5.3G -V -M kaihwang -m e -e ~/tmp -o ~/tmp ~/tmp/dFC_graph${s}.sh
 	#fi
 done
 
@@ -38,6 +38,6 @@ for s in $(cat /home/despoB/kaihwang/bin/ThaGate/TRSE_subject); do  #$(/bin/ls -
 	#if [ ! -e "/home/despoB/kaihwang/Rest/Graph/gsetCI_${Subject}.mat" ]; then
 	sed "s/s in 1106/s in ${s}/g" < ${SCRIPT}/python_qsub.sh > ~/tmp/${s}.sh
 	echo "bash ~/tmp/${s}.sh TRSE" > ~/tmp/dFC_graph${s}.sh
-	qsub -l mem_free=3.5G -V -M kaihwang -m e -e ~/tmp -o ~/tmp ~/tmp/dFC_graph${s}.sh
+	qsub -l mem_free=3.9G -V -M kaihwang -m e -e ~/tmp -o ~/tmp ~/tmp/dFC_graph${s}.sh
 	#fi
 done

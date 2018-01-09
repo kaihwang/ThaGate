@@ -177,8 +177,9 @@ if __name__ == "__main__":
 
 	subject, sequence, roi, w = raw_input().split()
 	
-	run_d_graph(subject, sequence, roi, w, thresh = 1, imp = False, part = False)
-	run_d_graph(subject, sequence, roi, w, thresh = .1, imp = False, part = False)
+	#run_d_graph(subject, sequence, roi, w, thresh = 1, imp = False, part = False)
+	for d in np.arange(0.05, 0.175, 0.025):
+		run_d_graph(subject, sequence, roi, w, thresh = d, imp = False, part = False)
 
 
 
