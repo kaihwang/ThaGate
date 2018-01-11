@@ -60,10 +60,10 @@ def map_indiv_target(subj, seq, dset):
 	return Max, Min
 
 
-def load_graph_metric(subj, seq, window, measure, impose = True, thresh = 0.1, partial = False):
+def load_graph_metric(subj, seq, roi, window, measure, impose = True, thresh = 0.1, partial = False):
 	'''shorthand to load graph metric'''
 	
-	fn = '/home/despoB/connectome-thalamus/ThaGate/Graph/%s_%s_Morel_plus_Yeo400_w%s_impose%s_t%s_partial%s_%s.npy' %(subj, seq, window, impose, thresh, partial, measure)
+	fn = '/home/despoB/connectome-thalamus/ThaGate/Graph/%s_%s_%s_w%s_impose%s_t%s_partial%s_%s.npy' %(subj, seq, roi, window, impose, thresh, partial, measure)
 	y = np.load(fn)
 
 	#if measure == 'phis':  #maxwell's calculation on club coeff transposed matrices
@@ -315,7 +315,7 @@ def consolidate_HCP_task_graph(Subjects, seq = 'WM'):
 	return df
 
 
-def consolidate_task_graph(Subjects, seq = 'WM'):
+def consolidate_task_graph(Subjects, roi, seq = 'WM', window=10, thresh = 1):
 	'''function to compile task graph metrics into df'''
 	df = pd.DataFrame(columns=('Subject', 'ROI', 'PC', 'WMD', 'WW', 'BW')) 
 
@@ -325,9 +325,7 @@ def consolidate_task_graph(Subjects, seq = 'WM'):
 		pdf = pd.DataFrame(columns=('Subject', 'ROI', 'PC', 'WMD', 'WW', 'BW')) 
 		
 		for measure in measures:
-			window =10
-			thresh = 1
-			y = load_graph_metric(subj, seq, window, measure, impose = False, thresh = thresh, partial = False)
+			y = load_graph_metric(subj, seq, roi, window, measure, impose = False, thresh = thresh, partial = False)
 			pdf[measure] = np.nanmean(y, axis=1)
 
 		pdf['Subject'] = subj
@@ -363,25 +361,25 @@ def run_regmodel_corticothalamo(Subjects, seq, window, measures, HCP = False, In
 
 if __name__ == "__main__":
 
-	########################
-	######## Do NKI and HCP
+	################################################
+	######## Do NKI and HCP, halt as of Jan 2018
 
 	#get list of NKI subjects
-	with open("/home/despoB/kaihwang/bin/ThaGate/NKI_subjlist") as f:
-		NKISubjects = [line.rstrip() for line in f]
+	# with open("/home/despoB/kaihwang/bin/ThaGate/NKI_subjlist") as f:
+	# 	NKISubjects = [line.rstrip() for line in f]
 	
-	with open("/home/despoB/kaihwang/bin/ThaGate/HCP_subjlist") as f:
-		HCPSubjects = [line.rstrip() for line in f]
+	# with open("/home/despoB/kaihwang/bin/ThaGate/HCP_subjlist") as f:
+	# 	HCPSubjects = [line.rstrip() for line in f]
 		
-	measures = ['PC', 'WMD', 'WW', 'BW', 'q']
+	# measures = ['PC', 'WMD', 'WW', 'BW', 'q']
 	
-	#### test nodal variables
-	#get cortical ROI targets of each thalamic nuclei from morel atlas
-	#MaxYeo400_Morel, MinYeo400_Morel, Morel_Yeo400_M = map_target()
-	#np.save('Data/MaxYeo400_MorelPar', MaxYeo400_Morel)
-	#np.save('Data/MinYeo400_Morel', MinYeo400_Morel)
-	#np.save('Data/Morel_Yeo400_M', Morel_Yeo400_M)
-	MaxYeo400_Morel = np.load('Data/MaxYeo400_Morel.npy')
+	# #### test nodal variables
+	# #get cortical ROI targets of each thalamic nuclei from morel atlas
+	# #MaxYeo400_Morel, MinYeo400_Morel, Morel_Yeo400_M = map_target()
+	# #np.save('Data/MaxYeo400_MorelPar', MaxYeo400_Morel)
+	# #np.save('Data/MinYeo400_Morel', MinYeo400_Morel)
+	# #np.save('Data/Morel_Yeo400_M', Morel_Yeo400_M)
+	# MaxYeo400_Morel = np.load('Data/MaxYeo400_Morel.npy')
 	
 	#test cortical target 152
 	#ctarget=np.tile([151, 363, 111, 367, 153, 105,  74, 161, 368, 154, 160, 362,  87,
@@ -414,7 +412,7 @@ if __name__ == "__main__":
 	#HCP_MOTOR_grpTarget_MTD_noImpose_df.to_csv('Data/HCP_MOTOR_grpTarget_MTD_nompose_df.csv')
 
 
-	########################
+	########################################################################
 	######## Do TRSE and TDSigEI
 
 
@@ -425,12 +423,15 @@ if __name__ == "__main__":
 		TDSigEISubjects = [line.rstrip() for line in f]
 		
 	measures = ['PC', 'WMD', 'WW', 'BW', 'q']
-
+	
 
 	#### get task diff in graph
 	df={}
+	window = 10
+	thresh = 1
+	roi='Morel_Striatum_Yeo400_LPI'
 	for seq in ['HF', 'FH', 'Fp', 'Hp']:
-		df[seq] =consolidate_task_graph(TDSigEISubjects, seq = seq)
+		df[seq] =consolidate_task_graph(TDSigEISubjects, roi, seq = seq, window=window, thresh=thresh)
 
 	### TRSE
 	# window =10

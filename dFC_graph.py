@@ -94,6 +94,9 @@ def cal_dynamic_graph(MTD, impose=False, threshold = False):
 	
 	for i, t in enumerate(range(0,time_points)):
 		matrix = MTD[i,:,:]
+
+		#need to deal with NANs because of coverage (no signal in some ROIs)
+		matrix[np.isnan(matrix)] = 0
 		
 		#threshold here
 		if threshold:
@@ -178,7 +181,7 @@ if __name__ == "__main__":
 	subject, sequence, roi, w = raw_input().split()
 	
 	#run_d_graph(subject, sequence, roi, w, thresh = 1, imp = False, part = False)
-	Ds=np.array([0.05 0.075, 0.125, 0.15])
+	Ds=np.array([1, 0.1]) #0.05, 0.075, 0.125, 0.15
 	for d in Ds:
 		run_d_graph(subject, sequence, roi, w, thresh = d, imp = False, part = False)
 
