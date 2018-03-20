@@ -220,6 +220,7 @@ def run_regmodel(Subjects, seq, window, measures, HCP = False, IndivTarget = Tru
 	
 	return df
 
+
 def save_object(obj, filename):
     with open(filename, 'wb') as output:
         pickle.dump(obj, output, pickle.HIGHEST_PROTOCOL)
@@ -315,22 +316,34 @@ def consolidate_HCP_task_graph(Subjects, seq = 'WM'):
 	return df
 
 
-def consolidate_task_graph(Subjects, roi, seq = 'WM', window=10, thresh = 1):
+def consolidate_task_graph(Subjects, roi, seq = 'WM', window=10, thresh = 1, dFC = False):
 	'''function to compile task graph metrics into df'''
-	df = pd.DataFrame(columns=('Subject', 'ROI', 'PC', 'WMD', 'WW', 'BW')) 
+	df = pd.DataFrame(columns=('Subject', 'Time', 'ROI', 'PC', 'WMD', 'WW', 'BW')) 
 
 	measures = ['PC', 'WMD', 'WW', 'BW']
 
 	for subj in Subjects:
-		pdf = pd.DataFrame(columns=('Subject', 'ROI', 'PC', 'WMD', 'WW', 'BW')) 
-		
+		if dFC == False:
+			pdf = pd.DataFrame(columns=('Subject', 'ROI', 'PC', 'WMD', 'WW', 'BW')) 
+		if dFC:
+			pdf = pd.DataFrame(columns=('Subject', 'Time', 'PC', 'WMD', 'WW', 'BW')) 
+
 		for measure in measures:
 			y = load_graph_metric(subj, seq, roi, window, measure, impose = False, thresh = thresh, partial = False)
-			pdf[measure] = np.nanmean(y, axis=1)
+			
+			if dFC == False:
+				pdf[measure] = np.nanmean(y, axis=1) #data dimension is ROI by time, average across time
+			if dFC:
+				pdf[measure] = np.nanmean(y, axis=0) #ave across ROI. #y.flatten() #np.reshape(y,(y.shape[0]*y.shape[1]))	# flatten data dimension
 
 		pdf['Subject'] = subj
-		pdf['ROI'] = range(y.shape[0])
+		if dFC == False:
+			pdf['ROI'] = range(y.shape[0])
+		if dFC:
+			#pdf['ROI'] = np.repeat(range(y.shape[0]), y.shape[1]) #repeat ROI
+			pdf['Time']	= range(y.shape[1]) #np.repeat(range(y.shape[1]), y.shape[0]) #repeat Time
 		df = pd.concat([df, pdf])	
+	
 	return df
 
 
@@ -426,19 +439,27 @@ if __name__ == "__main__":
 	
 
 	#### get task diff in graph
-	df={}
-	window = 10
-	thresh = 1
-	roi='Morel_Striatum_Yeo400_LPI'
-	for seq in ['HF', 'FH', 'Fp', 'Hp']:
-		df[seq] =consolidate_task_graph(TDSigEISubjects, roi, seq = seq, window=window, thresh=thresh)
+	# TRSEdf = {}
+	# window = 15
+	# thresh = 1.0
+	# roi = 'Morel_Striatum_Yeo400_LPI'
+	# for seq in ['HF', 'FH', 'BO', 'CAT']:
+	# 	TRSEdf[seq] =consolidate_task_graph(TRSESubjects, roi, seq = seq, window=window, thresh=thresh, dFC = False )
+
+	#saveobj(TRSEdf, 'Data/TRSE_dFC_Graph')	
 
 	### TRSE
-	# window =10
-	# for seq in ['HF', 'FH', 'Fp', 'Hp', 'Fo', 'Ho']:
-	# 	df = run_regmodel(TDSigEISubjects, seq, window, measures, HCP = False, IndivTarget = False, MTD = True, impose = False, part = False, nodeselection = MaxYeo400_Morel)
-	# 	fn = 'Data/TDSigEI_%s.csv' %seq
-	# 	df.to_csv(fn)
+	TDdf = {}
+	window =10
+	thresh = 1.0
+	roi = 'Morel_Striatum_Yeo400_LPI'
+	for seq in ['HF', 'FH', 'Fp', 'Hp', 'Fo', 'Ho']:
+		TDdf[seq] =consolidate_task_graph(TDSigEISubjects, roi, seq = seq, window=window, thresh=thresh, dFC = False)
+
+		#df = run_regmodel(TDSigEISubjects, seq, window, measures, HCP = False, IndivTarget = False, MTD = True, impose = False, part = False, nodeselection = MaxYeo400_Morel)
+		#fn = 'Data/TDSigEI_%s.csv' %seq
+		#df.to_csv(fn)
+	save_object(TDdf, 'Data/TD_dFC_Graph')		
 
 
 
