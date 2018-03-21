@@ -369,8 +369,28 @@ def run_regmodel_corticothalamo(Subjects, seq, window, measures, HCP = False, In
 			seq2 = seq+'_RL'
 
 	
+def regression_task_ts(graph_df, condition, metric):
+	'''Use AFNI's 3dDeconvolve to generate task ideal TS for graph dFC regression'''
 
+	#Used 3dDeconvolve to generate stim block TS:
+	#3dDeconvolve -polort -1 -nodata 407 1.5 -num_stimts 1 -stim_times 1 '1D: 2 42 83 123 155 195 236 276 308 348 389 429 461 501 542 582' 'BLOCK(20,1)' -x1D Ideal -x1D_stop
 
+	stim = np.loadtxt('/home/despoB/kaihwang/bin/ThaGate/Ideal.xmat.1D')
+
+	df = pd.DataFrame(columns=('Subject', 'Condition', 'Coef')) 
+	for i, sub in enumerate(graph_df[condition]['Subject'].unique()):
+		#sdf = pd.DataFrame(columns=('Subject', 'Condition', 'Coef'))
+		y = graph_df[condition].loc[graph_df[condition]['Subject'] == sub][metric].values
+		x = sm.add_constant(stim)	
+		Y = y[y != 0] #remove MTD start and end 
+		X = x[y != 0]
+
+		df.loc[i, 'Coef'] = sm.OLS(Y, X).fit().params[1]
+		df.loc[i, 'Subject'] = sub
+		df.loc[i, 'Condition'] = condition
+		#df = pd.concat([df, sdf])
+	df['Coef'] = df['Coef'].astype('float64')
+	return df	
 
 if __name__ == "__main__":
 
@@ -439,27 +459,52 @@ if __name__ == "__main__":
 	
 
 	#### get task diff in graph
-	# TRSEdf = {}
-	# window = 15
-	# thresh = 1.0
-	# roi = 'Morel_Striatum_Yeo400_LPI'
+	TRSEdf = {}
+	window = 15
+	thresh = 1.0
+	roi = 'Morel_Striatum_Yeo400_LPI'
+	for seq in ['HF', 'FH', 'BO', 'CAT']:
+		TRSEdf[seq] =consolidate_task_graph(TRSESubjects, roi, seq = seq, window=window, thresh=thresh, dFC = True )
+
+	save_object(TRSEdf, 'Data/TRSE_dFC_Graph')	
+
+	# df = pd.DataFrame(columns=('Subject', 'Condition', 'Coef'))
 	# for seq in ['HF', 'FH', 'BO', 'CAT']:
-	# 	TRSEdf[seq] =consolidate_task_graph(TRSESubjects, roi, seq = seq, window=window, thresh=thresh, dFC = False )
-
-	#saveobj(TRSEdf, 'Data/TRSE_dFC_Graph')	
-
+	# 	sdf = regression_task_ts(TRSEdf, seq, 'PC')
+	# 	df = pd.concat([df, sdf])
+	# #df.groupby('Condition')['Coef'].mean()	
+	
 	### TRSE
 	TDdf = {}
 	window =10
-	thresh = 1.0
+	thresh = 0.05
 	roi = 'Morel_Striatum_Yeo400_LPI'
 	for seq in ['HF', 'FH', 'Fp', 'Hp', 'Fo', 'Ho']:
-		TDdf[seq] =consolidate_task_graph(TDSigEISubjects, roi, seq = seq, window=window, thresh=thresh, dFC = False)
+		TDdf[seq] =consolidate_task_graph(TDSigEISubjects, roi, seq = seq, window=window, thresh=thresh, dFC = True)
 
 		#df = run_regmodel(TDSigEISubjects, seq, window, measures, HCP = False, IndivTarget = False, MTD = True, impose = False, part = False, nodeselection = MaxYeo400_Morel)
 		#fn = 'Data/TDSigEI_%s.csv' %seq
 		#df.to_csv(fn)
+
 	save_object(TDdf, 'Data/TD_dFC_Graph')		
+
+	df = pd.DataFrame(columns=('Subject', 'Condition', 'Coef'))
+	for seq in ['HF', 'FH', 'Fp', 'Hp', 'Fo', 'Ho']:
+		sdf = regression_task_ts(TDdf, seq, 'PC')
+		df = pd.concat([df, sdf])
+	df.groupby('Condition')['Coef'].mean()	
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
