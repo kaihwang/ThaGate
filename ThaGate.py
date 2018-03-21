@@ -8,6 +8,8 @@ import statsmodels.api as sm
 from dFC_graph import coupling
 from matplotlib import colors
 import pickle as pickle
+import bct
+import os
 #%matplotlib qt #don't forget this when plotting...
 
 def map_target():
@@ -316,7 +318,7 @@ def consolidate_HCP_task_graph(Subjects, seq = 'WM'):
 	return df
 
 
-def consolidate_task_graph(Subjects, roi, seq = 'WM', window=10, thresh = 1, dFC = False):
+def consolidate_task_graph(Subjects, roi, seq = 'WM', window=10, thresh = 1, dFC = False, sFC = False):
 	'''function to compile task graph metrics into df'''
 	df = pd.DataFrame(columns=('Subject', 'Time', 'ROI', 'PC', 'WMD', 'WW', 'BW')) 
 
@@ -331,11 +333,15 @@ def consolidate_task_graph(Subjects, roi, seq = 'WM', window=10, thresh = 1, dFC
 		for measure in measures:
 			y = load_graph_metric(subj, seq, roi, window, measure, impose = False, thresh = thresh, partial = False)
 			
-			if dFC == False:
+			if (dFC == False) & (sFC == False):
 				pdf[measure] = np.nanmean(y, axis=1) #data dimension is ROI by time, average across time
-			if dFC:
+			elif (dFC == True) & (sFC == False):
 				pdf[measure] = np.nanmean(y, axis=0) #ave across ROI. #y.flatten() #np.reshape(y,(y.shape[0]*y.shape[1]))	# flatten data dimension
-
+			elif (dFC == False) & (sFC == True):
+				pdf[measure] = y #len of ROI
+			else
+				pdf[measure] = np.nan #hu!!???		
+				
 		pdf['Subject'] = subj
 		if dFC == False:
 			pdf['ROI'] = range(y.shape[0])
@@ -492,7 +498,7 @@ if __name__ == "__main__":
 	for seq in ['HF', 'FH', 'Fp', 'Hp', 'Fo', 'Ho']:
 		sdf = regression_task_ts(TDdf, seq, 'PC')
 		df = pd.concat([df, sdf])
-	df.groupby('Condition')['Coef'].mean()	
+			
 
 
 
