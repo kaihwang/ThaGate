@@ -338,8 +338,8 @@ def consolidate_task_graph(Subjects, roi, seq = 'WM', window=10, thresh = 1, dFC
 			elif (dFC == True) & (sFC == False):
 				pdf[measure] = np.nanmean(y, axis=0) #ave across ROI. #y.flatten() #np.reshape(y,(y.shape[0]*y.shape[1]))	# flatten data dimension
 			elif (dFC == False) & (sFC == True):
-				pdf[measure] = y #len of ROI
-			else
+				pdf[measure] = y.tolist() #len of ROI
+			else:
 				pdf[measure] = np.nan #hu!!???		
 				
 		pdf['Subject'] = subj
@@ -466,13 +466,13 @@ if __name__ == "__main__":
 
 	#### get task diff in graph
 	TRSEdf = {}
-	window = 15
-	thresh = 1.0
+	window = 0
+	thresh = 0.05
 	roi = 'Morel_Striatum_Yeo400_LPI'
 	for seq in ['HF', 'FH', 'BO', 'CAT']:
-		TRSEdf[seq] =consolidate_task_graph(TRSESubjects, roi, seq = seq, window=window, thresh=thresh, dFC = True )
+		TRSEdf[seq] =consolidate_task_graph(TRSESubjects, roi, seq = seq, window=window, thresh=thresh, dFC = False, sFC=True )
 
-	save_object(TRSEdf, 'Data/TRSE_dFC_Graph')	
+	#save_object(TRSEdf, 'Data/TRSE_dFC_Graph')	
 
 	# df = pd.DataFrame(columns=('Subject', 'Condition', 'Coef'))
 	# for seq in ['HF', 'FH', 'BO', 'CAT']:
@@ -482,22 +482,22 @@ if __name__ == "__main__":
 	
 	### TRSE
 	TDdf = {}
-	window =10
+	window =0
 	thresh = 0.05
 	roi = 'Morel_Striatum_Yeo400_LPI'
 	for seq in ['HF', 'FH', 'Fp', 'Hp', 'Fo', 'Ho']:
-		TDdf[seq] =consolidate_task_graph(TDSigEISubjects, roi, seq = seq, window=window, thresh=thresh, dFC = True)
+		TDdf[seq] =consolidate_task_graph(TDSigEISubjects, roi, seq = seq, window=window, thresh=thresh, dFC = False, sFC=True)
 
 		#df = run_regmodel(TDSigEISubjects, seq, window, measures, HCP = False, IndivTarget = False, MTD = True, impose = False, part = False, nodeselection = MaxYeo400_Morel)
 		#fn = 'Data/TDSigEI_%s.csv' %seq
 		#df.to_csv(fn)
 
-	save_object(TDdf, 'Data/TD_dFC_Graph')		
+	#save_object(TDdf, 'Data/TD_dFC_Graph')		
 
-	df = pd.DataFrame(columns=('Subject', 'Condition', 'Coef'))
-	for seq in ['HF', 'FH', 'Fp', 'Hp', 'Fo', 'Ho']:
-		sdf = regression_task_ts(TDdf, seq, 'PC')
-		df = pd.concat([df, sdf])
+	# df = pd.DataFrame(columns=('Subject', 'Condition', 'Coef'))
+	# for seq in ['HF', 'FH', 'Fp', 'Hp', 'Fo', 'Ho']:
+	# 	sdf = regression_task_ts(TDdf, seq, 'PC')
+	# 	df = pd.concat([df, sdf])
 			
 
 

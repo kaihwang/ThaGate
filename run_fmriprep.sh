@@ -12,8 +12,8 @@ fmriprep \
     --nthreads 4 \
     --output-space T1w template \
     --template MNI152NLin2009cAsym \
-    --use-aroma \
     --fs-no-reconall \
+    --force-no-bbr \
     ${WD}/BIDS/ \
     ${WD}/fmriprep/ \
     participant

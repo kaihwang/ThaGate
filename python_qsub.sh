@@ -39,7 +39,7 @@ case "$1" in
 	TDSigEI)
 		cd /home/despoB/kaihwang/TRSE/TDSigEI
 		for s in 503; do  #$(/bin/ls -d *)
-			for roi in Morel_Striatum_Yeo400_LPI Morel_Striatum_Gordon_LPI WTA_Striatum_Gordon_LPI; do #Morel_plus_Yeo17 
+			for roi in Morel_Striatum_Gordon_LPI WTA_Striatum_Gordon_LPI Morel_plus_Yeo17 Morel_Striatum_Yeo400_LPI; do #Morel_plus_Yeo17 Morel_Striatum_Yeo400_LPI 
 
 				for sequence in FH HF Fp Hp Fo Ho; do
 					echo "${s} ${sequence} ${roi} 10" | python /home/despoB/kaihwang/bin/ThaGate/dFC_graph.py
@@ -53,7 +53,7 @@ case "$1" in
 	TRSE)
 		cd /home/despoB/kaihwang/TRSE/TRSEPPI/AllSubjs
 		for s in 1106; do  #$(/bin/ls -d *)
-			for roi in Morel_Striatum_Yeo400_LPI Morel_Striatum_Gordon_LPI WTA_Striatum_Gordon_LPI; do #Morel_plus_Yeo17 
+			for roi in Morel_Striatum_Gordon_LPI WTA_Striatum_Gordon_LPI Morel_plus_Yeo17 Morel_Striatum_Yeo400_LPI ; do #Morel_plus_Yeo17 Morel_Striatum_Yeo400_LPI 	
 
 				for sequence in FH HF CAT BO; do
 					echo "${s} ${sequence} ${roi} 15" | python /home/despoB/kaihwang/bin/ThaGate/dFC_graph.py
