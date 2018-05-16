@@ -13,7 +13,6 @@ fmriprep \
     --output-space T1w template \
     --template MNI152NLin2009cAsym \
     --fs-no-reconall \
-    --force-no-bbr \
     ${WD}/BIDS/ \
     ${WD}/fmriprep/ \
     participant
