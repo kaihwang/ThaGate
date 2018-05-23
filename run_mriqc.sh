@@ -1,6 +1,6 @@
 #!/bin/sh
 source /home/despoB/kaihwang/.bashrc;
-source activate mriqc;
+source activate mriqc.9;
 #SUB_ID=$(echo ${SGE_TASK} | grep -Eo "^[[:digit:]]{1,}")
 #session=$(echo ${SGE_TASK} | grep -Eo "[A-Z][a-zA-Z0-9]{1,}")
 SUB_ID=${SGE_TASK} #"${SGE_TASK}";
