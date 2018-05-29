@@ -318,36 +318,44 @@ def consolidate_HCP_task_graph(Subjects, seq = 'WM'):
 	return df
 
 
-def consolidate_task_graph(Subjects, roi, seq = 'WM', window=10, thresh = 1, dFC = False, sFC = False):
+def consolidate_task_graph(Subjects, roi, ave_across_ROIs = True, seq = 'WM', window=10, thresh = 1, dFC = False, sFC = False):
 	'''function to compile task graph metrics into df'''
-	df = pd.DataFrame(columns=('Subject', 'Time', 'ROI', 'PC', 'WMD', 'WW', 'BW')) 
+	df = pd.DataFrame(columns=('Subject', 'ROI', 'Time', 'PC', 'WMD', 'WW', 'BW')) 
 
 	measures = ['PC', 'WMD', 'WW', 'BW']
 
 	for subj in Subjects:
 		if dFC == False:
 			pdf = pd.DataFrame(columns=('Subject', 'ROI', 'PC', 'WMD', 'WW', 'BW')) 
-		if dFC:
-			pdf = pd.DataFrame(columns=('Subject', 'Time', 'PC', 'WMD', 'WW', 'BW')) 
+		if (dFC == True) & (ave_across_ROIs == True):
+			pdf = pd.DataFrame(columns=('Subject', 'Time', 'PC', 'WMD', 'WW', 'BW'))
+		if (dFC == True) & (ave_across_ROIs == False):
+			pdf = pd.DataFrame(columns=('Subject', 'ROI', 'Time', 'PC', 'WMD', 'WW', 'BW'))	 
 
 		for measure in measures:
 			y = load_graph_metric(subj, seq, roi, window, measure, impose = False, thresh = thresh, partial = False)
 			
 			if (dFC == False) & (sFC == False):
 				pdf[measure] = np.nanmean(y, axis=1) #data dimension is ROI by time, average across time
-			elif (dFC == True) & (sFC == False):
+			elif (dFC == True) & (sFC == False) & (ave_across_ROIs == True):
 				pdf[measure] = np.nanmean(y, axis=0) #ave across ROI. #y.flatten() #np.reshape(y,(y.shape[0]*y.shape[1]))	# flatten data dimension
-			elif (dFC == False) & (sFC == True):
-				pdf[measure] = y.tolist() #len of ROI
+			# elif (dFC == False) & (sFC == True):
+			# 	pdf[measure] = y.tolist() #len of ROI, something wrong here.
+			elif (dFC == True) & (sFC == False) & (ave_across_ROIs == False):
+				pdf[measure] = y.flatten()
 			else:
-				pdf[measure] = np.nan #hu!!???		
+				pdf[measure] = np.nan #huh!!???		
 				
 		pdf['Subject'] = subj
 		if dFC == False:
 			pdf['ROI'] = range(y.shape[0])
-		if dFC:
+		elif (dFC == True) & (ave_across_ROIs == True):
 			#pdf['ROI'] = np.repeat(range(y.shape[0]), y.shape[1]) #repeat ROI
 			pdf['Time']	= range(y.shape[1]) #np.repeat(range(y.shape[1]), y.shape[0]) #repeat Time
+		elif (dFC == True) & (ave_across_ROIs == False):
+			pdf['ROI'] = np.repeat(np.arange(0, y.shape[0]), y.shape[1]) #repeat ROIs
+			pdf['Time'] = np.tile(np.arange(0, y.shape[1]), y.shape[0])  #repeat time	
+		
 		df = pd.concat([df, pdf])	
 	
 	return df
@@ -401,7 +409,7 @@ def regression_task_ts(graph_df, condition, metric):
 if __name__ == "__main__":
 
 	################################################
-	######## Do NKI and HCP, halt as of Jan 2018
+	######## Do NKI and HCP, graph metric flucation across rest, halt as of Jan 2018
 
 	#get list of NKI subjects
 	# with open("/home/despoB/kaihwang/bin/ThaGate/NKI_subjlist") as f:
@@ -452,7 +460,7 @@ if __name__ == "__main__":
 
 
 	########################################################################
-	######## Do TRSE and TDSigEI
+	######## Do TRSE and TDSigEI, graph metric change by task
 
 
 	with open("/home/despoB/kaihwang/bin/ThaMTD/Data/TRSE_subject") as f:
@@ -461,16 +469,16 @@ if __name__ == "__main__":
 	with open("/home/despoB/kaihwang/bin/ThaMTD/Data/TDSigEI_subject") as f:
 		TDSigEISubjects = [line.rstrip() for line in f]
 		
-	measures = ['PC', 'WMD', 'WW', 'BW', 'q']
+	measures = ['PC', 'WMD', 'WW', 'BW']
 	
 
 	#### get task diff in graph
-	TRSEdf = {}
-	window = 0
-	thresh = 0.05
-	roi = 'Morel_Striatum_Yeo400_LPI'
-	for seq in ['HF', 'FH', 'BO', 'CAT']:
-		TRSEdf[seq] =consolidate_task_graph(TRSESubjects, roi, seq = seq, window=window, thresh=thresh, dFC = False, sFC=True )
+	# TRSEdf = {}
+	# window = 0
+	# thresh = 0.05
+	# roi = 'Morel_Striatum_Yeo400_LPI'
+	# for seq in ['HF', 'FH', 'BO', 'CAT']:
+	# 	TRSEdf[seq] =consolidate_task_graph(TRSESubjects, roi, seq = seq, window=window, thresh=thresh, dFC = False, sFC=True )
 
 	#save_object(TRSEdf, 'Data/TRSE_dFC_Graph')	
 
@@ -482,17 +490,17 @@ if __name__ == "__main__":
 	
 	### TRSE
 	TDdf = {}
-	window =0
-	thresh = 0.05
+	window = 10
+	thresh = 1.0
 	roi = 'Morel_Striatum_Yeo400_LPI'
 	for seq in ['HF', 'FH', 'Fp', 'Hp', 'Fo', 'Ho']:
-		TDdf[seq] =consolidate_task_graph(TDSigEISubjects, roi, seq = seq, window=window, thresh=thresh, dFC = False, sFC=True)
+		TDdf[seq] =consolidate_task_graph(TDSigEISubjects, roi, ave_across_ROIs = False, seq = seq, window=window, thresh=thresh, dFC = True, sFC=False)
 
 		#df = run_regmodel(TDSigEISubjects, seq, window, measures, HCP = False, IndivTarget = False, MTD = True, impose = False, part = False, nodeselection = MaxYeo400_Morel)
 		#fn = 'Data/TDSigEI_%s.csv' %seq
 		#df.to_csv(fn)
 
-	#save_object(TDdf, 'Data/TD_dFC_Graph')		
+	save_object(TDdf, 'Data/TD_dFC_Graph')		
 
 	# df = pd.DataFrame(columns=('Subject', 'Condition', 'Coef'))
 	# for seq in ['HF', 'FH', 'Fp', 'Hp', 'Fo', 'Ho']:
