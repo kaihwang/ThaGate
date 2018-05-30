@@ -10,6 +10,8 @@ from matplotlib import colors
 import pickle as pickle
 import bct
 import os
+from scipy.stats import ttest_rel
+from statsmodels.stats.multitest import fdrcorrection
 #%matplotlib qt #don't forget this when plotting...
 
 def map_target():
@@ -339,15 +341,15 @@ def consolidate_task_graph(Subjects, roi, ave_across_ROIs = True, seq = 'WM', wi
 				pdf[measure] = np.nanmean(y, axis=1) #data dimension is ROI by time, average across time
 			elif (dFC == True) & (sFC == False) & (ave_across_ROIs == True):
 				pdf[measure] = np.nanmean(y, axis=0) #ave across ROI. #y.flatten() #np.reshape(y,(y.shape[0]*y.shape[1]))	# flatten data dimension
-			# elif (dFC == False) & (sFC == True):
-			# 	pdf[measure] = y.tolist() #len of ROI, something wrong here.
+			elif (dFC == False) & (sFC == True):
+			 	pdf[measure] = y.tolist() #len of ROI
 			elif (dFC == True) & (sFC == False) & (ave_across_ROIs == False):
 				pdf[measure] = y.flatten()
 			else:
 				pdf[measure] = np.nan #huh!!???		
 				
 		pdf['Subject'] = subj
-		if dFC == False:
+		if (dFC == False) & (sFC == True):
 			pdf['ROI'] = range(y.shape[0])
 		elif (dFC == True) & (ave_across_ROIs == True):
 			#pdf['ROI'] = np.repeat(range(y.shape[0]), y.shape[1]) #repeat ROI
@@ -387,24 +389,66 @@ def regression_task_ts(graph_df, condition, metric):
 	'''Use AFNI's 3dDeconvolve to generate task ideal TS for graph dFC regression'''
 
 	#Used 3dDeconvolve to generate stim block TS:
-	#3dDeconvolve -polort -1 -nodata 407 1.5 -num_stimts 1 -stim_times 1 '1D: 2 42 83 123 155 195 236 276 308 348 389 429 461 501 542 582' 'BLOCK(20,1)' -x1D Ideal -x1D_stop
-
+	#for TDSigEI:
+		#3dDeconvolve -polort -1 -nodata 407 1.5 -num_stimts 1 -stim_times 1 '1D: 2 42 83 123 155 195 236 276 308 348 389 429 461 501 542 582' 'BLOCK(20,1)' -x1D Ideal -x1D_stop
+		
+		
 	stim = np.loadtxt('/home/despoB/kaihwang/bin/ThaGate/Ideal.xmat.1D')
 
-	df = pd.DataFrame(columns=('Subject', 'Condition', 'Coef')) 
-	for i, sub in enumerate(graph_df[condition]['Subject'].unique()):
-		#sdf = pd.DataFrame(columns=('Subject', 'Condition', 'Coef'))
-		y = graph_df[condition].loc[graph_df[condition]['Subject'] == sub][metric].values
-		x = sm.add_constant(stim)	
-		Y = y[y != 0] #remove MTD start and end 
-		X = x[y != 0]
+	df = pd.DataFrame(columns=('Subject', 'Condition', 'ROI', 'Coef')) 
 
-		df.loc[i, 'Coef'] = sm.OLS(Y, X).fit().params[1]
-		df.loc[i, 'Subject'] = sub
-		df.loc[i, 'Condition'] = condition
-		#df = pd.concat([df, sdf])
+	i = 0
+	for sub in graph_df[condition]['Subject'].unique():
+
+		for roi in graph_df[condition]['ROI'].unique():
+
+			#sdf = pd.DataFrame(columns=('Subject', 'Condition', 'Coef'))
+			y = graph_df[condition].loc[(graph_df[condition]['Subject'] == sub) & (graph_df[condition]['ROI'] == roi)][metric].values
+			x = sm.add_constant(stim)
+			y[np.isnan(y)]=0	
+			Y = y[y != 0] #remove MTD start and end 
+			X = x[y != 0]
+
+			try:
+				df.loc[i, 'Coef'] = sm.OLS(Y, X).fit().params[1]
+			except:
+				df.loc[i, 'Coef'] = np.nan
+
+			df.loc[i, 'ROI'] = roi
+			df.loc[i, 'Subject'] = sub
+			df.loc[i, 'Condition'] = condition
+			i=i+1
+
+		
 	df['Coef'] = df['Coef'].astype('float64')
+	
 	return df	
+
+
+def test_nodal_graph_task_change(df, tasks, metric):
+	''' do stats on nodal graph, compare bewteen tasks, mean '''
+
+	#tasks = df.keys()
+	#for task in tasks:
+	
+	#HF_df = TDdf['Hp'].groupby(['Subject', 'ROI']).mean().reset_index()	
+	df1 = df[tasks[0]].groupby(['Subject', 'ROI']).mean().reset_index() # mean across time, separately for subj and roi
+	df2 = df[tasks[1]].groupby(['Subject', 'ROI']).mean().reset_index()
+	
+	ROIs = np.unique(df1['ROI'].values)
+
+	Ts = np.zeros(len(ROIs))
+	Ps = np.zeros(len(ROIs))
+	
+	for roi in ROIs:
+		x1 = df1.loc[df1['ROI']==roi][metric].values
+		x2 = df2.loc[df2['ROI']==roi][metric].values
+
+		Ts[roi],Ps[roi] = ttest_rel(x1, x2)
+
+	#HF_df.loc[HF_df['ROI']==roi]
+	return Ts, Ps
+
 
 if __name__ == "__main__":
 
@@ -474,39 +518,76 @@ if __name__ == "__main__":
 
 	#### get task diff in graph
 	# TRSEdf = {}
-	# window = 0
-	# thresh = 0.05
-	# roi = 'Morel_Striatum_Yeo400_LPI'
+	# window = 15
+	# thresh = 1.0
+	# roi = 'Morel_Striatum_Gordon_LPI'
 	# for seq in ['HF', 'FH', 'BO', 'CAT']:
-	# 	TRSEdf[seq] =consolidate_task_graph(TRSESubjects, roi, seq = seq, window=window, thresh=thresh, dFC = False, sFC=True )
+	# 	TRSEdf[seq] =consolidate_task_graph(TRSESubjects, roi, ave_across_ROIs = False, seq = seq, window=window, thresh=thresh, dFC = True, sFC=False )
 
-	#save_object(TRSEdf, 'Data/TRSE_dFC_Graph')	
+	# # #save_object(TRSEdf, 'Data/TRSE_dFC_Graph')	
+
+	# # test task diff in graph, mean:
+	# tasks = ['BO', 'CAT']
+	# Ts, Ps = test_nodal_graph_task_change(TRSEdf, tasks, 'PC')
+	# print(fdrcorrection(Ps[~np.isnan(Ps)])[0])
+
+	# tasks = ['HF', 'CAT']
+	# Ts, Ps = test_nodal_graph_task_change(TRSEdf, tasks, 'PC')
+	# print(fdrcorrection(Ps[~np.isnan(Ps)])[0])
+
+
 
 	# df = pd.DataFrame(columns=('Subject', 'Condition', 'Coef'))
 	# for seq in ['HF', 'FH', 'BO', 'CAT']:
 	# 	sdf = regression_task_ts(TRSEdf, seq, 'PC')
 	# 	df = pd.concat([df, sdf])
-	# #df.groupby('Condition')['Coef'].mean()	
+	#df.groupby('Condition')['Coef'].mean()	
 	
 	### TRSE
 	TDdf = {}
-	window = 10
-	thresh = 1.0
+	window = 0
+	thresh = 0.1
 	roi = 'Morel_Striatum_Yeo400_LPI'
+
+
 	for seq in ['HF', 'FH', 'Fp', 'Hp', 'Fo', 'Ho']:
-		TDdf[seq] =consolidate_task_graph(TDSigEISubjects, roi, ave_across_ROIs = False, seq = seq, window=window, thresh=thresh, dFC = True, sFC=False)
+		TDdf[seq] =consolidate_task_graph(TDSigEISubjects, roi, ave_across_ROIs = False, seq = seq, window=window, thresh=thresh, dFC = False, sFC=True)
 
 		#df = run_regmodel(TDSigEISubjects, seq, window, measures, HCP = False, IndivTarget = False, MTD = True, impose = False, part = False, nodeselection = MaxYeo400_Morel)
 		#fn = 'Data/TDSigEI_%s.csv' %seq
 		#df.to_csv(fn)
 
-	save_object(TDdf, 'Data/TD_dFC_Graph')		
+	#save_object(TDdf, 'Data/TD_dFC_Graph')		
 
-	# df = pd.DataFrame(columns=('Subject', 'Condition', 'Coef'))
-	# for seq in ['HF', 'FH', 'Fp', 'Hp', 'Fo', 'Ho']:
-	# 	sdf = regression_task_ts(TDdf, seq, 'PC')
-	# 	df = pd.concat([df, sdf])
-			
+	## test task diff in graph metric, regression:
+	# metric = 'PC'
+	# df1 = regression_task_ts(TDdf, 'HF', metric)
+	# df2 = regression_task_ts(TDdf, 'Hp', metric)
+
+	# Ts = np.zeros(len(df1['ROI'].unique()))
+	# Ps = np.zeros(len(df1['ROI'].unique()))
+
+	# for roi in df1['ROI'].unique():
+	# 	x1 = df1.loc[df1['ROI']==roi]['Coef'].values
+	# 	x2 = df2.loc[df2['ROI']==roi]['Coef'].values
+
+	#  	Ts[roi],Ps[roi] = ttest_rel(x1, x2)
+	
+
+	## test task diff in graph, mean:
+	# tasks = ['HF', 'Hp']
+	# Ts, Ps = test_nodal_graph_task_change(TDdf, tasks, 'BW')
+	# print(fdrcorrection(Ps[~np.isnan(Ps)])[0])
+
+	# tasks = ['FH', 'Fp']
+	# Ts, Ps = test_nodal_graph_task_change(TDdf, tasks, 'BW')
+	# print(fdrcorrection(Ps[~np.isnan(Ps)])[0])
+
+
+
+	#%matplotlib qt
+	#plt.ion()
+	#sns.distplot(Ts[~np.isnan(Ts)])
 
 
 
