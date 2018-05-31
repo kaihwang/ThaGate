@@ -64,10 +64,13 @@ def map_indiv_target(subj, seq, dset):
 	return Max, Min
 
 
-def load_graph_metric(subj, seq, roi, window, measure, impose = True, thresh = 0.1, partial = False):
+def load_graph_metric(subj, seq, roi, window, measure, impose = True, thresh = 0.1, FIR=False, partial = False):
 	'''shorthand to load graph metric'''
 	
-	fn = '/home/despoB/connectome-thalamus/ThaGate/Graph/%s_%s_%s_w%s_impose%s_t%s_partial%s_%s.npy' %(subj, seq, roi, window, impose, thresh, partial, measure)
+	if FIR:
+		fn = '/home/despoB/connectome-thalamus/ThaGate/Graph/%s_%s_%s_w%s_impose%s_t%s_partial%s_%s.npy' %(subj, seq, roi, window, impose, thresh, partial, measure)
+	elif FIR==False:
+		fn = '/home/despoB/connectome-thalamus/ThaGate/Graph/%s_%s_%s_w%s_impose%s_t%s_partial%s_FIR%s_%s.npy' %(subj, seq, roi, window, impose, thresh, partial, FIR, measure)
 	y = np.load(fn)
 
 	#if measure == 'phis':  #maxwell's calculation on club coeff transposed matrices
@@ -320,7 +323,7 @@ def consolidate_HCP_task_graph(Subjects, seq = 'WM'):
 	return df
 
 
-def consolidate_task_graph(Subjects, roi, ave_across_ROIs = True, seq = 'WM', window=10, thresh = 1, dFC = False, sFC = False):
+def consolidate_task_graph(Subjects, roi, ave_across_ROIs = True, seq = 'WM', window=10, thresh = 1, dFC = False, sFC = False, FIR = False):
 	'''function to compile task graph metrics into df'''
 	df = pd.DataFrame(columns=('Subject', 'ROI', 'Time', 'PC', 'WMD', 'WW', 'BW')) 
 
@@ -335,7 +338,7 @@ def consolidate_task_graph(Subjects, roi, ave_across_ROIs = True, seq = 'WM', wi
 			pdf = pd.DataFrame(columns=('Subject', 'ROI', 'Time', 'PC', 'WMD', 'WW', 'BW'))	 
 
 		for measure in measures:
-			y = load_graph_metric(subj, seq, roi, window, measure, impose = False, thresh = thresh, partial = False)
+			y = load_graph_metric(subj, seq, roi, window, measure, impose = False, thresh = thresh, partial = False, FIR=FIR)
 			
 			if (dFC == False) & (sFC == False):
 				pdf[measure] = np.nanmean(y, axis=1) #data dimension is ROI by time, average across time
@@ -449,6 +452,23 @@ def test_nodal_graph_task_change(df, tasks, metric):
 	#HF_df.loc[HF_df['ROI']==roi]
 	return Ts, Ps
 
+def mask_image(atlas_path, select_ROIs):
+
+    image = nib.load(atlas_path)
+    image_data = image.get_data()
+
+    #header = image.header()
+    #header.set_data_dtype(np.float)
+
+    value_data = image_data.copy()	
+    value_data[value_data!=0]=0
+
+    for ix,i in enumerate(select_ROIs):
+        value_data[image_data==select_ROIs[ix]] = 5
+
+    image_data[:,:,:,] = value_data[:,:,:,]
+    return image
+
 
 if __name__ == "__main__":
 
@@ -546,12 +566,12 @@ if __name__ == "__main__":
 	### TRSE
 	TDdf = {}
 	window = 0
-	thresh = 0.1
+	thresh = 1.0
 	roi = 'Morel_Striatum_Yeo400_LPI'
 
 
 	for seq in ['HF', 'FH', 'Fp', 'Hp', 'Fo', 'Ho']:
-		TDdf[seq] =consolidate_task_graph(TDSigEISubjects, roi, ave_across_ROIs = False, seq = seq, window=window, thresh=thresh, dFC = False, sFC=True)
+		TDdf[seq] =consolidate_task_graph(TDSigEISubjects, roi, ave_across_ROIs = False, seq = seq, window=window, thresh=thresh, dFC = False, sFC=True, FIR=False)
 
 		#df = run_regmodel(TDSigEISubjects, seq, window, measures, HCP = False, IndivTarget = False, MTD = True, impose = False, part = False, nodeselection = MaxYeo400_Morel)
 		#fn = 'Data/TDSigEI_%s.csv' %seq
@@ -574,23 +594,37 @@ if __name__ == "__main__":
 	#  	Ts[roi],Ps[roi] = ttest_rel(x1, x2)
 	
 
-	## test task diff in graph, mean:
-	# tasks = ['HF', 'Hp']
-	# Ts, Ps = test_nodal_graph_task_change(TDdf, tasks, 'BW')
-	# print(fdrcorrection(Ps[~np.isnan(Ps)])[0])
+	# test task diff in graph, mean:
+	tasks = ['HF', 'Hp']
+	hTs, hPs = test_nodal_graph_task_change(TDdf, tasks, 'PC')
+	#print(fdrcorrection(hPs[~np.isnan(hPs)])[0])
+	print(hTs[hPs<.05])
 
-	# tasks = ['FH', 'Fp']
-	# Ts, Ps = test_nodal_graph_task_change(TDdf, tasks, 'BW')
-	# print(fdrcorrection(Ps[~np.isnan(Ps)])[0])
+	tasks = ['FH', 'Fp']
+	fTs, fPs = test_nodal_graph_task_change(TDdf, tasks, 'PC')
+	print(fTs[fPs<.05])
+	#print(fdrcorrection(fPs[~np.isnan(fPs)])[0])
 
 
 
+	### Plotting
 	#%matplotlib qt
 	#plt.ion()
 	#sns.distplot(Ts[~np.isnan(Ts)])
 
+	# take a look at Yeo 400 ROIs
+	from nilearn import image
+	from nilearn import plotting
+	import nibabel as nib
 
+	ROIspath='/home/despoB/kaihwang/Rest/ROIs/400ROIs.nii.gz'
+	ROIs=image.load_img(ROIspath)
 
+	#plotting.plot_roi(ROIs, title="Yeo400")
+	#plotting.show()
+
+	#plotting.plot_glass_brain(mask_image(ROIspath, np.where(hPs<.05)[0]), title="h")
+	#plotting.plot_glass_brain(mask_image(ROIspath, np.where(fPs<.05)[0]), title="f")
 
 
 
