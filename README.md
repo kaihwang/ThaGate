@@ -1,7 +1,6 @@
 # ThaGate
 
-By predict, I mean in a regression kind of a way. So it is not true prediction. I know. 
-
+Thalamic activity gating cortical interactions?
 Gate? What Gate???
 
 Follow up on graph analysis of thalamocortical connectivity.
