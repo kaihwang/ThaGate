@@ -101,21 +101,32 @@ mtd, sma = MTD(cortical_ts,5) #sma is the smoothed version that has NaNs because
 
 brain_masker = NiftiMasker()
 brain_time_series = brain_masker.fit_transform(nii_data)
-print(brain_time_series) #time by voxels
+print(brain_time_series.shape) #time by voxels
 
-#build the X, if you want to include interaction terms from model parameters do it here
-X = np.array([np.ones(len(sma)),sma[:,0,1]]).T
-X = np.vstack((np.full(X.shape[1:], np.nan), X)) #add nan to the first element given its derivative, so the length matches the length of the timeseries
+#now do the loop, fit the model iteratively using evoked responses from different voxels as the X
 
-#remove nans. We also need to remove "run breaks" later 
-nans = np.unique(np.where(np.isnan(X))[0])
-if any(nans):
-    X = np.delete(X, nans, axis=0)
-    brain_time_series = np.delete(brain_time_series, nans, axis=0)
+num_voxels = brain_time_series.shape[1]
+betas_vector = np.zeros(num_voxels)
+for i in range(num_voxels):
 
-# fit the model, solve the betas
-results = linalg.lstsq(X, brain_time_series) #this is solving b in bX = brain_timeseries)
+    #build the X, if you want to include interaction terms from model parameters do it here. also including an intercept term
+    X = np.array([np.ones((sma.shape[0])), brain_time_series[1:, i]]).T  # note we are sking the first element because MTD is one less (derivative)
 
-# extract the betas, put it in brain space
-beta_nii = brain_masker.inverse_transform(results[0][1,:]) #the first X is intercept, so select the second one
-#you can save or plot this brain image, solve this sub by sub to do group stats using standard approaches. See if there are sig clusters in thalamus or anywhere else.
+    y = sma[:,0,1] # select the dFC pair to run the regression model 
+
+    #remove nans. We also need to remove "run breaks" later 
+    nans = np.unique(np.where(np.isnan(y))[0])
+    if any(nans):
+        X = np.delete(X, nans, axis=0)
+        y = np.delete(y, nans, axis=0)
+
+    # fit the model, solve the betas
+    results = linalg.lstsq(X, y) #this is solving b in bX = dFC, if you include other interaction terms or parameters you will get them from the results
+                                 # here I am using lstsq solver because it is faster, the downside is it will only solve the b but will not calcuate p or t values
+                                 # but that is ok, we can just test the b against zero at the group level 
+                                 # there is probably a way to do this faster instead of a single loop, but too lazy to program that now. This is running 250k+ of regressions in a single loop
+
+    # extract the betas, put it in brain space
+    betas_vector[i] = results[0][1] #the first X is intercept, so select the second one
+
+betas_nii = brain_masker.inverse_transform(betas_vector) # you can plot this or save it into a nii file for group analysis later
