@@ -1,642 +1,121 @@
-from FuncParcel import *
 import numpy as np
 import nibabel as nib
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
-from dFC_graph import coupling
-from matplotlib import colors
 import pickle as pickle
-import bct
-import os
-from scipy.stats import ttest_rel
-from statsmodels.stats.multitest import fdrcorrection
-#%matplotlib qt #don't forget this when plotting...
-
-def map_target():
-	'''use NKI dataset to find cortical targets(Yeo17 or Yeo400) for each thalamic nuclei'''
-	
-	# # average matrices then find max YeoNetwork
-	# Morel_Yeo17_M = average_corrmat('/home/despoB/connectome-thalamus/ThaGate/Matrices/NKI*_Morel_plus_Yeo17_645_corrmat', np_txt=True, pickle_object=False)
-	# np.fill_diagonal(Morel_Yeo17_M, 0)
-	# MaxYeo17_Morel = np.argmax(Morel_Yeo17_M[17:,0:17],1)+1
-
-	# # average matrices then find max YeoNetwork using partial correlation
-	# Morel_Yeo17_pM = average_corrmat('/home/despoB/connectome-thalamus/ThaGate/Matrices/NKI*_Morel_plus_Yeo17_645_partial_corrmat', np_txt=True, pickle_object=False)
-	# np.fill_diagonal(Morel_Yeo17_pM, 0)
-	# MaxYeo17_Morel_pM = np.argmax(Morel_Yeo17_pM[17:,0:17],1)+1
-
-
-	#Morel_Yeo400_M = average_corrmat('/home/despoB/connectome-thalamus/ThaGate/Matrices/NKI*_Morel_plus_Yeo400_1400_corrmat', np_txt=True, pickle_object=False)
-	Morel_Yeo400_M = average_corrmat('/home/despoB/connectome-thalamus/ThaGate/Matrices/*_Morel_plus_Yeo400_1400_pcorr_mat', np_txt=True, pickle_object=False)
-	np.fill_diagonal(Morel_Yeo400_M, 0)
-	Morel_Yeo400_M[np.isnan(Morel_Yeo400_M)] = 0
-	M = Morel_Yeo400_M[400:,0:400]
-	MaxYeo400_Morel = np.argsort(M,1)[:,-1:-6:-1] #np.argmax(Morel_Yeo400_M[400:,0:400],1)+1 #max connections at the end
-	MinYeo400_Morel = np.argsort(M,1)[:,0:5]
-	return MaxYeo400_Morel, MinYeo400_Morel, Morel_Yeo400_M
-
-
-def map_indiv_target(subj, seq, dset):
-	''' feed in individual matrix and find cortical targets for each thalamic nuclei'''
-	
-	if dset == 'NKI':
-		#fn = '/home/despoB/connectome-thalamus/ThaGate/Matrices/%s_%s_Morel_plus_Yeo400_%s_corrmat' %(dset, subj, seq)
-		fn = '/home/despoB/connectome-thalamus/ThaGate/Matrices/%s_Morel_plus_Yeo400_%s_pcorr_mat' %(subj, seq)
-		M = np.loadtxt(fn)
-		
-	
-	if dset == 'HCP':
-		#fn = '/home/despoB/connectome-thalamus/ThaGate/Matrices/%s_%s_Morel_plus_Yeo400_%s_corrmat' %(dset, subj, 'rfMRI_REST2_RL')
-		fn = '/home/despoB/connectome-thalamus/ThaGate/Matrices/%s_Morel_plus_Yeo400_%s_pcorr_mat' %(subj, 'rfMRI_REST2_RL')	
-		M1 = np.loadtxt(fn)
-		#fn = '/home/despoB/connectome-thalamus/ThaGate/Matrices/%s_%s_Morel_plus_Yeo400_%s_corrmat' %(dset, subj, 'rfMRI_REST2_LR')
-		fn = '/home/despoB/connectome-thalamus/ThaGate/Matrices/%s_Morel_plus_Yeo400_%s_pcorr_mat' %(subj, 'rfMRI_REST2_LR')
-		M2 = np.loadtxt(fn)
-		M = (M1 + M2)/2
-
-	np.fill_diagonal(M, 0)
-	M[np.isnan(M)] = 0
-	Cortical_M = M[400:,0:400]
-	Max = np.argsort(Cortical_M,1)[:,-1:-6:-1] 
-	Min = np.argsort(Cortical_M,1)[:,0:5]	
-	return Max, Min
-
-
-def load_graph_metric(subj, seq, roi, window, measure, impose = True, thresh = 0.1, FIR=False, partial = False):
-	'''shorthand to load graph metric'''
-	
-	if FIR:
-		fn = '/home/despoB/connectome-thalamus/ThaGate/Graph/%s_%s_%s_w%s_impose%s_t%s_partial%s_%s.npy' %(subj, seq, roi, window, impose, thresh, partial, measure)
-	elif FIR==False:
-		fn = '/home/despoB/connectome-thalamus/ThaGate/Graph/%s_%s_%s_w%s_impose%s_t%s_partial%s_FIR%s_%s.npy' %(subj, seq, roi, window, impose, thresh, partial, FIR, measure)
-	y = np.load(fn)
-
-	#if measure == 'phis':  #maxwell's calculation on club coeff transposed matrices
-	#	y = y.T 		   #the dimension should be ROI by time
-
-	return y
-
-
-def tha_morel_ts(subj, seq, window):
-	'''shorthand to load tha ts from morel atlas (15 nuclei)'''
-	fn = '/home/despoB/kaihwang/Rest/ThaGate/NotBackedUp/' + subj +'_Morel_plus_Yeo400' + '_' + str(seq) +'_000.netts'
-	y = np.loadtxt(fn)
-	ts = y[400:,1:].T #last 15 rows are morel nuclei, take out first timepoint because MTD is temp derivative. Transpose for statsmodel.
-	return ts
-
-
-def tha_morel_plus_cortical_ts(subj, seq, window):
-	'''shorthand to load tha ts from morel atlas (15 nuclei)'''
-	fn = '/home/despoB/kaihwang/Rest/ThaGate/NotBackedUp/' + subj +'_Morel_plus_Yeo400' + '_' + str(seq) +'_000.netts'
-	y = np.loadtxt(fn)
-	ts = y.T #last 15 rows are morel nuclei, take out first timepoint because MTD is temp derivative. Transpose for statsmodel.
-	return ts
-
-
-def fit_linear_model(y,x):
-	'''multiple linear regression using OLS in statsmodel'''
-	#need to take out nans first
-	Y = y[~np.isnan(y)]
-	X = x[~np.isnan(y)]
-	Y = Y[~np.isnan(X)]
-	X = X[~np.isnan(X)]
-
-	#add constant
-	X = sm.add_constant(X)   
-	est = sm.OLS(Y, X).fit() #OLS fit
-	return est 
-
-
-def cortical_graph(Subjects, seq, measures, HCP = True, impose = True):
-	'''wrapper function to compile coritcal ROI's graph metrics into a dataframe'''
-	df = pd.DataFrame(columns=('Subject', 'PC', 'WMD', 'WW', 'BW', 'q', 'phis')) 
-
-	if HCP:
-		seq1 = seq+'_LR'
-		seq2 = seq+'_RL'
-	
-	#loop
-	for i, subj in enumerate(Subjects):
-		sdf = pd.DataFrame(columns=('Subject', 'PC', 'WMD', 'WW', 'BW', 'q', 'phis'), index = [0]) 
-		sdf.loc[0]['Subject'] = subj
-
-		for measure in measures:
-			if not HCP:
-				y = load_graph_metric(subj, seq, window, measure, impose = impose)
-			if HCP:
-				y = np.hstack((load_graph_metric(subj, seq1, window, measure, impose = True), load_graph_metric(subj, seq2, window, measure, impose = True)))	
-
-			sdf.loc[0][measure]= np.nanmean(y)		
-		df = pd.concat([df, sdf])		
-	return df	
-
-def run_regmodel(Subjects, seq, window, measures, HCP = False, IndivTarget = True, MTD = False, impose = False, part = False, nodeselection = np.nan, thresh = 1, saveobj = False):
-	''' wrapper script to test thalamic acitivty's or thalamocortical connectivity's effect on  network properties
-	if calculating global metrics (eg, q, avePC), then set nodeselection = np.nan. 
-	if using MTD between neuclei and cortical targets as predictors, set MTD = True'''
-	
-	df = pd.DataFrame(columns=('Subject', 'Thalamic Nuclei', 'PC', 'WMD', 'WW', 'BW', 'q', 'phis')) 
- 	Nuclei = ['AN','VM', 'VL', 'MGN', 'MD', 'PuA', 'LP', 'IL', 'VA', 'Po', 'LGN', 'PuM', 'PuI', 'PuL', 'VP']
-	
-	#loop through subjects
-	for i, subj in enumerate(Subjects):
-		
-		#create subject dataframe
-		sdf = pd.DataFrame(columns=('Subject', 'Thalamic Nuclei', 'PC', 'WMD', 'WW', 'BW', 'q', 'phis')) 
-		sdf['Thalamic Nuclei'] = Nuclei
-		sdf['Subject'] = subj
-
-		#two runs for HCP
-		if HCP:
-			seq1 = seq+'_LR'
-			seq2 = seq+'_RL'
-
-		for measure in measures:
-
-			if impose == False:
-				if not HCP:
-					y = load_graph_metric(subj, seq, window, measure, impose = False, thresh = thresh, partial = part)
-				else:
-					y = np.hstack((load_graph_metric(subj, seq1, window, measure, impose = False, thresh = thresh, partial = part), load_graph_metric(subj, seq2, window, measure, impose = False, thresh = thresh, partial = part)))
-			if impose == True:
-				if not HCP:
-					y = load_graph_metric(subj, seq, window, measure, impose = True, thresh = thresh, partial = part)
-				else:
-					y = np.hstack((load_graph_metric(subj, seq1, window, measure, impose = True, thresh = thresh, partial = part), load_graph_metric(subj, seq2, window, measure, impose = True, thresh = thresh, partial = part)))
-
-			#set it to nan for cal global metrics, average across nodes
-			if np.isnan(nodeselection).all(): 
-				if y.ndim > 1: # for q then no averaging 
-					#if dimension more than 1, average across nodes (global prooperty)
-					y = np.nanmean(y, axis=0)
-
-			#if not doing coupling, then use thalamic ts		
-			if MTD == False: 	
-				if not HCP:	
-					x = tha_morel_ts(subj, seq, window)	
-				if HCP:
-					x = np.vstack((tha_morel_ts(subj, seq1, window), tha_morel_ts(subj, seq2, window)))
-
-			#if doing coupling, then extract thalamic and cortical ts and do MTD coupling calculation later	
-			if MTD == True:
-				if not HCP:
-					ts = tha_morel_plus_cortical_ts(subj, seq, window)	
-				if HCP:
-					ts = np.vstack((tha_morel_plus_cortical_ts(subj, seq1, window), tha_morel_plus_cortical_ts(subj, seq2, window)))
-
-			# if using individual matrices to find cortical targets	
-			if IndivTarget:
-				if not HCP:
-					nodeselection, _ = map_indiv_target(subj, seq, dset = 'NKI')	
-				if HCP:
-					nodeselection, _ = map_indiv_target(subj, seq, dset = 'HCP')
-
-
-			#fit one var at a time because of potential co-linearity between nuclei
-			for j in np.arange(len(Nuclei)):
-
-				#if selecting certain cortical targets, select nodes before averaging
-				if np.alltrue(~np.isnan(nodeselection)): #
-					if y.ndim > 1:  # for q then no averaging 
-						y = np.nanmean(y[nodeselection[j,:],:],axis=0) #use nodeselection vector to select cortical nodes and average nodal metrics
-				
-				if MTD == True:
-					#extract cortical targets and thalamic nuclei ts						
-					i = np.append(nodeselection[j,:],np.array(400+j)) #append the nuclei as last colum (400+j)
-					# do MTD coupling
-					sma = coupling(ts[:,i],window)[1]
-					# ave coupling score for each thalamic nuclei and beweten its cortical targets
-					x = np.squeeze(np.nanmean(sma[:,len(i)-1:,][:,:,0:len(i)-1], axis=2)) #len(i)-1 is to determine number of cortical targets included (minus 15 thalamic nuclei)
-					#try:
-					est = fit_linear_model(y,x)
-					#except:
-					#	pass
-
-				if MTD == False:	
-					est = fit_linear_model(y,x[:,j])
-
-				sdf[measure].loc[sdf['Thalamic Nuclei'] == Nuclei[j]] = est.tvalues[1]
-
-				if saveobj:
-					fn = '/home/despoB/connectome-thalamus/ThaGate/Graph/'+subj+'_'+str(seq)+'_'+str(window)+'_'+measure+'_reg_est.pickle' 
-					save_object(est, fn)
-
-		df = pd.concat([df, sdf])
-	
-	return df
-
-
-def save_object(obj, filename):
-    with open(filename, 'wb') as output:
-        pickle.dump(obj, output, pickle.HIGHEST_PROTOCOL)
-
-
-def YeoNetwork_parcellation():
-	''' parcelate thalamus using Yeo17 networks'''
-	# average matrices
-	M = average_corrmat('/home/despoB/kaihwang/Rest/ThaGate/Matrices/*thavox_plus_Yeo17_645*', np_txt=True, pickle_object=False)
-
-	subcortical_voxels = np.loadtxt('/home/despoB/connectome-thalamus/ROIs/thalamus_voxel_indices')
-	cortical_ROIs = np.arange(1,15)
-	subcorticalcortical_ROIs = np.append(cortical_ROIs, subcortical_voxels)
-	_, ParcelCIs, _, = parcel_subcortical_network(M, subcorticalcortical_ROIs, subcortical_voxels, cortical_ROIs, cortical_ROIs)
-
-	#create a mask based on the morel atlas 
-	Morel_atlas = np.loadtxt('/home/despoB/connectome-thalamus/Thalamic_parcel/Morel_parcel')
-	Morel_mask = np.loadtxt('/home/despoB/connectome-thalamus/Thalamic_parcel/morel_mask')
-	mask_value = Morel_mask==0
-
-	CIs = sort_CI(ParcelCIs)
-	return CIs
-
-
-def sort_CI(Thalamo_ParcelCIs):
-    CIs = np.zeros(len(Thalamus_voxel_coordinate))
-    for i, thalamus_voxel_index in enumerate(Thalamus_voxel_coordinate[:,3]):
-        CIs[i] = Thalamo_ParcelCIs[thalamus_voxel_index][0]
-    CIs = CIs.astype(int)
-    return CIs
-
-
-def visualize_parcellation(CIs, cmap):
-    # show volum image
-    MNI_img = nib.load('/home/despoB/connectome-thalamus/ROIs/MNI152_T1_2mm_brain.nii.gz')
-    MNI_data = MNI_img.get_data()
-    Thalamus_voxel_coordinate = np.loadtxt('/home/despoB/connectome-thalamus/ROIs/thalamus_voxels_ijk_indices', dtype = int)
-
-    # create mask for parcel
-    Mask = np.zeros(MNI_data.shape)
-
-
-    # assign CI to each subcortical voxel
-    for i, CI in enumerate(CIs):
-        Mask[Thalamus_voxel_coordinate[i,0], Thalamus_voxel_coordinate[i,1], Thalamus_voxel_coordinate[i,2]] = CIs[i].astype(int)
-    Mask = np.ma.masked_where(Mask == 0, Mask)
-
-    # flip dimension to show anteiror of the brain at top
-    MNI_data = MNI_data.swapaxes(0,1)
-    Mask = Mask.swapaxes(0,1)
-
-    # some plot setting (colormap), interplotation..
-    #cmap = colors.ListedColormap(['red', 'blue', 'cyan', 'yellow', 'teal', 'purple', 'pink', 'green', 'black'])
-    #cmap = colors.ListedColormap(['blue', 'red', 'cyan', 'yellow', 'green'])
-    # display slice by slice
-    Z_slices = range(np.min(Thalamus_voxel_coordinate[:,2])+2, np.max(Thalamus_voxel_coordinate[:,2])-1,2)
-    fig = plt.figure()
-    for i, Z_slice in enumerate(Z_slices):
-        #if i <4:
-        a = plt.subplot(1, len(Z_slices), i+1 )
-        #else:
-        #    a = plt.subplot(2, len(Z_slices)/2, i+1-4 )
-        a.set_yticks([])
-        a.set_xticks([])
-        plt.imshow(MNI_data[45:65, 30:60, Z_slice], cmap='gray', interpolation='nearest')
-        plt.imshow(Mask[45:65, 30:60, Z_slice],cmap=cmap, interpolation='none', vmin = 1, vmax=np.max(CIs))
-        plt.ylim(plt.ylim()[::-1])
-        
-    fig.tight_layout() 
-    fig.set_size_inches(6.45, 0.7) 
-   # plt.savefig(savepath, bbox_inches='tight')
-
-
-def consolidate_HCP_task_graph(Subjects, seq = 'WM'):
-	'''function to compile task graph metrics into df'''
-	df = pd.DataFrame(columns=('Subject', 'ROI', 'PC', 'WMD', 'WW', 'BW')) 
-
-	measures = ['PC', 'WMD', 'WW', 'BW']
-
-	for subj in Subjects:
-		pdf = pd.DataFrame(columns=('Subject', 'ROI', 'PC', 'WMD', 'WW', 'BW')) 
-		
-		for measure in measures:
-			seq1 = seq +'_LR'
-			seq2 = seq +'_RL'
-			window =15
-			y = np.hstack((load_graph_metric(subj, seq1, window, measure, impose = False, thresh = 1, partial = True), load_graph_metric(subj, seq2, window, measure, impose = False, thresh = 1, partial = True)))
-			pdf[measure] = np.nanmean(y, axis=1)
-
-		pdf['Subject'] = subj
-		pdf['ROI'] = range(y.shape[0])
-		df = pd.concat([df, pdf])	
-	return df
-
-
-def consolidate_task_graph(Subjects, roi, ave_across_ROIs = True, seq = 'WM', window=10, thresh = 1, dFC = False, sFC = False, FIR = False):
-	'''function to compile task graph metrics into df'''
-	df = pd.DataFrame(columns=('Subject', 'ROI', 'Time', 'PC', 'WMD', 'WW', 'BW')) 
-
-	measures = ['PC', 'WMD', 'WW', 'BW']
-
-	for subj in Subjects:
-		if dFC == False:
-			pdf = pd.DataFrame(columns=('Subject', 'ROI', 'PC', 'WMD', 'WW', 'BW')) 
-		if (dFC == True) & (ave_across_ROIs == True):
-			pdf = pd.DataFrame(columns=('Subject', 'Time', 'PC', 'WMD', 'WW', 'BW'))
-		if (dFC == True) & (ave_across_ROIs == False):
-			pdf = pd.DataFrame(columns=('Subject', 'ROI', 'Time', 'PC', 'WMD', 'WW', 'BW'))	 
-
-		for measure in measures:
-			y = load_graph_metric(subj, seq, roi, window, measure, impose = False, thresh = thresh, partial = False, FIR=FIR)
-			
-			if (dFC == False) & (sFC == False):
-				pdf[measure] = np.nanmean(y, axis=1) #data dimension is ROI by time, average across time
-			elif (dFC == True) & (sFC == False) & (ave_across_ROIs == True):
-				pdf[measure] = np.nanmean(y, axis=0) #ave across ROI. #y.flatten() #np.reshape(y,(y.shape[0]*y.shape[1]))	# flatten data dimension
-			elif (dFC == False) & (sFC == True):
-			 	pdf[measure] = y.tolist() #len of ROI
-			elif (dFC == True) & (sFC == False) & (ave_across_ROIs == False):
-				pdf[measure] = y.flatten()
-			else:
-				pdf[measure] = np.nan #huh!!???		
-				
-		pdf['Subject'] = subj
-		if (dFC == False) & (sFC == True):
-			pdf['ROI'] = range(y.shape[0])
-		elif (dFC == True) & (ave_across_ROIs == True):
-			#pdf['ROI'] = np.repeat(range(y.shape[0]), y.shape[1]) #repeat ROI
-			pdf['Time']	= range(y.shape[1]) #np.repeat(range(y.shape[1]), y.shape[0]) #repeat Time
-		elif (dFC == True) & (ave_across_ROIs == False):
-			pdf['ROI'] = np.repeat(np.arange(0, y.shape[0]), y.shape[1]) #repeat ROIs
-			pdf['Time'] = np.tile(np.arange(0, y.shape[1]), y.shape[0])  #repeat time	
-		
-		df = pd.concat([df, pdf])	
-	
-	return df
-
-
-
-def run_regmodel_corticothalamo(Subjects, seq, window, measures, HCP = False, IndivTarget = True, MTD = False, impose = False, part = False, nodeselection = np.nan, thresh = 1, saveobj = False):
-	''' wrapper script to test thalamic acitivty's or thalamocortical connectivity's effect on network properties
-	The difference for this version is that instead of finding cortical targets for each thalamic nuclei, it will preselect cortical regions and include all nuclei in the nuclei'''
-
-	df = pd.DataFrame(columns=('Subject', 'Thalamic Nuclei', 'PC', 'WMD', 'WW', 'BW', 'q', 'phis')) 
- 	Nuclei = ['AN','VM', 'VL', 'MGN', 'MD', 'PuA', 'LP', 'IL', 'VA', 'Po', 'LGN', 'PuM', 'PuI', 'PuL', 'VP']
-	
-	#loop through subjects
-	for i, subj in enumerate(Subjects):
-		
-		#create subject dataframe
-		sdf = pd.DataFrame(columns=('Subject', 'Thalamic Nuclei', 'PC', 'WMD', 'WW', 'BW', 'q', 'phis')) 
-		sdf['Thalamic Nuclei'] = Nuclei
-		sdf['Subject'] = subj
-
-		#two runs for HCP
-		if HCP:
-			seq1 = seq+'_LR'
-			seq2 = seq+'_RL'
-
-	
-def regression_task_ts(graph_df, condition, metric):
-	'''Use AFNI's 3dDeconvolve to generate task ideal TS for graph dFC regression'''
-
-	#Used 3dDeconvolve to generate stim block TS:
-	#for TDSigEI:
-		#3dDeconvolve -polort -1 -nodata 407 1.5 -num_stimts 1 -stim_times 1 '1D: 2 42 83 123 155 195 236 276 308 348 389 429 461 501 542 582' 'BLOCK(20,1)' -x1D Ideal -x1D_stop
-		
-		
-	stim = np.loadtxt('/home/despoB/kaihwang/bin/ThaGate/Ideal.xmat.1D')
-
-	df = pd.DataFrame(columns=('Subject', 'Condition', 'ROI', 'Coef')) 
-
-	i = 0
-	for sub in graph_df[condition]['Subject'].unique():
-
-		for roi in graph_df[condition]['ROI'].unique():
-
-			#sdf = pd.DataFrame(columns=('Subject', 'Condition', 'Coef'))
-			y = graph_df[condition].loc[(graph_df[condition]['Subject'] == sub) & (graph_df[condition]['ROI'] == roi)][metric].values
-			x = sm.add_constant(stim)
-			y[np.isnan(y)]=0	
-			Y = y[y != 0] #remove MTD start and end 
-			X = x[y != 0]
-
-			try:
-				df.loc[i, 'Coef'] = sm.OLS(Y, X).fit().params[1]
-			except:
-				df.loc[i, 'Coef'] = np.nan
-
-			df.loc[i, 'ROI'] = roi
-			df.loc[i, 'Subject'] = sub
-			df.loc[i, 'Condition'] = condition
-			i=i+1
-
-		
-	df['Coef'] = df['Coef'].astype('float64')
-	
-	return df	
-
-
-def test_nodal_graph_task_change(df, tasks, metric):
-	''' do stats on nodal graph, compare bewteen tasks, mean '''
-
-	#tasks = df.keys()
-	#for task in tasks:
-	
-	#HF_df = TDdf['Hp'].groupby(['Subject', 'ROI']).mean().reset_index()	
-	df1 = df[tasks[0]].groupby(['Subject', 'ROI']).mean().reset_index() # mean across time, separately for subj and roi
-	df2 = df[tasks[1]].groupby(['Subject', 'ROI']).mean().reset_index()
-	
-	ROIs = np.unique(df1['ROI'].values)
-
-	Ts = np.zeros(len(ROIs))
-	Ps = np.zeros(len(ROIs))
-	
-	for roi in ROIs:
-		x1 = df1.loc[df1['ROI']==roi][metric].values
-		x2 = df2.loc[df2['ROI']==roi][metric].values
-
-		Ts[roi],Ps[roi] = ttest_rel(x1, x2)
-
-	#HF_df.loc[HF_df['ROI']==roi]
-	return Ts, Ps
-
-def mask_image(atlas_path, select_ROIs):
-
-    image = nib.load(atlas_path)
-    image_data = image.get_data()
-
-    #header = image.header()
-    #header.set_data_dtype(np.float)
-
-    value_data = image_data.copy()	
-    value_data[value_data!=0]=0
-
-    for ix,i in enumerate(select_ROIs):
-        value_data[image_data==select_ROIs[ix]] = 5
-
-    image_data[:,:,:,] = value_data[:,:,:,]
-    return image
-
-
-if __name__ == "__main__":
-
-	################################################
-	######## Do NKI and HCP, graph metric flucation across rest, halt as of Jan 2018
-
-	#get list of NKI subjects
-	# with open("/home/despoB/kaihwang/bin/ThaGate/NKI_subjlist") as f:
-	# 	NKISubjects = [line.rstrip() for line in f]
-	
-	# with open("/home/despoB/kaihwang/bin/ThaGate/HCP_subjlist") as f:
-	# 	HCPSubjects = [line.rstrip() for line in f]
-		
-	# measures = ['PC', 'WMD', 'WW', 'BW', 'q']
-	
-	# #### test nodal variables
-	# #get cortical ROI targets of each thalamic nuclei from morel atlas
-	# #MaxYeo400_Morel, MinYeo400_Morel, Morel_Yeo400_M = map_target()
-	# #np.save('Data/MaxYeo400_MorelPar', MaxYeo400_Morel)
-	# #np.save('Data/MinYeo400_Morel', MinYeo400_Morel)
-	# #np.save('Data/Morel_Yeo400_M', Morel_Yeo400_M)
-	# MaxYeo400_Morel = np.load('Data/MaxYeo400_Morel.npy')
-	
-	#test cortical target 152
-	#ctarget=np.tile([151, 363, 111, 367, 153, 105,  74, 161, 368, 154, 160, 362,  87,
-    #   150, 357, 156, 169, 387, 239],(15,1))	
-
-	### Do Rest, NKI
-	#seq = 645
-	#window = 16
-	#NKI_grpTarget_MTD_noImpose_Partial_df = run_regmodel(NKISubjects, seq, window, measures, HCP = False, IndivTarget = False, MTD = True, impose = False, part = False, nodeselection = MaxYeo400_Morel)
-	#NKI_grpTarget_MTD_noImpose_Partial_df.to_csv('Data/NKI_grpTarget_MTD_noImpose_Partial_df.csv')
-
-	### Replicate Rest, HCP
-	#seq = 'rfMRI_REST1'
-	#window =15
-
-	#HCP_Rest_grpTarget_MTD_noImpose_Partial_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, part = False, nodeselection = MaxYeo400_Morel)
-	#HCP_Rest_grpTarget_MTD_noImpose_Partial_df.to_csv('Data/HCP_Rest_grpTarget_MTD_noImpose_Partial_df.csv')
-
-	### Do HCP tasks
-	#seq = 'WM'
-	#window =15
-	#HCP_WM_grpTarget_MTD_noImpose_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, part = False, nodeselection = MaxYeo400_Morel)
-	#HCP_WM_grpTarget_MTD_noImpose_df.to_csv('Data/HCP_WM_grpTarget_MTD_noImpose_df.csv')
-	#HCP_WM_PCTarget_MTD_noImpose_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, part = False, nodeselection = ctarget)
-	#HCP_WM_PCTarget_MTD_noImpose_df.to_csv('Data/HCP_WM_PCTarget_MTD_noImpose_df.csv')
-
-	#seq = 'MOTOR'
-	#window =15
-	#HCP_MOTOR_grpTarget_MTD_noImpose_df = run_regmodel(HCPSubjects, seq, window, measures, HCP = True, IndivTarget = False, MTD = True, impose = False, part = False, nodeselection = MaxYeo400_Morel)
-	#HCP_MOTOR_grpTarget_MTD_noImpose_df.to_csv('Data/HCP_MOTOR_grpTarget_MTD_nompose_df.csv')
-
-
-	########################################################################
-	######## Do TRSE and TDSigEI, graph metric change by task
-
-
-	with open("/home/despoB/kaihwang/bin/ThaMTD/Data/TRSE_subject") as f:
-		TRSESubjects = [line.rstrip() for line in f]
-	
-	with open("/home/despoB/kaihwang/bin/ThaMTD/Data/TDSigEI_subject") as f:
-		TDSigEISubjects = [line.rstrip() for line in f]
-		
-	measures = ['PC', 'WMD', 'WW', 'BW']
-	
-
-	#### get task diff in graph
-	# TRSEdf = {}
-	# window = 15
-	# thresh = 1.0
-	# roi = 'Morel_Striatum_Gordon_LPI'
-	# for seq in ['HF', 'FH', 'BO', 'CAT']:
-	# 	TRSEdf[seq] =consolidate_task_graph(TRSESubjects, roi, ave_across_ROIs = False, seq = seq, window=window, thresh=thresh, dFC = True, sFC=False )
-
-	# # #save_object(TRSEdf, 'Data/TRSE_dFC_Graph')	
-
-	# # test task diff in graph, mean:
-	# tasks = ['BO', 'CAT']
-	# Ts, Ps = test_nodal_graph_task_change(TRSEdf, tasks, 'PC')
-	# print(fdrcorrection(Ps[~np.isnan(Ps)])[0])
-
-	# tasks = ['HF', 'CAT']
-	# Ts, Ps = test_nodal_graph_task_change(TRSEdf, tasks, 'PC')
-	# print(fdrcorrection(Ps[~np.isnan(Ps)])[0])
-
-
-
-	# df = pd.DataFrame(columns=('Subject', 'Condition', 'Coef'))
-	# for seq in ['HF', 'FH', 'BO', 'CAT']:
-	# 	sdf = regression_task_ts(TRSEdf, seq, 'PC')
-	# 	df = pd.concat([df, sdf])
-	#df.groupby('Condition')['Coef'].mean()	
-	
-	### TRSE
-	TDdf = {}
-	window = 0
-	thresh = 1.0
-	roi = 'Morel_Striatum_Yeo400_LPI'
-
-
-	for seq in ['HF', 'FH', 'Fp', 'Hp', 'Fo', 'Ho']:
-		TDdf[seq] =consolidate_task_graph(TDSigEISubjects, roi, ave_across_ROIs = False, seq = seq, window=window, thresh=thresh, dFC = False, sFC=True, FIR=False)
-
-		#df = run_regmodel(TDSigEISubjects, seq, window, measures, HCP = False, IndivTarget = False, MTD = True, impose = False, part = False, nodeselection = MaxYeo400_Morel)
-		#fn = 'Data/TDSigEI_%s.csv' %seq
-		#df.to_csv(fn)
-
-	#save_object(TDdf, 'Data/TD_dFC_Graph')		
-
-	## test task diff in graph metric, regression:
-	# metric = 'PC'
-	# df1 = regression_task_ts(TDdf, 'HF', metric)
-	# df2 = regression_task_ts(TDdf, 'Hp', metric)
-
-	# Ts = np.zeros(len(df1['ROI'].unique()))
-	# Ps = np.zeros(len(df1['ROI'].unique()))
-
-	# for roi in df1['ROI'].unique():
-	# 	x1 = df1.loc[df1['ROI']==roi]['Coef'].values
-	# 	x2 = df2.loc[df2['ROI']==roi]['Coef'].values
-
-	#  	Ts[roi],Ps[roi] = ttest_rel(x1, x2)
-	
-
-	# test task diff in graph, mean:
-	tasks = ['HF', 'Hp']
-	hTs, hPs = test_nodal_graph_task_change(TDdf, tasks, 'PC')
-	#print(fdrcorrection(hPs[~np.isnan(hPs)])[0])
-	print(hTs[hPs<.05])
-
-	tasks = ['FH', 'Fp']
-	fTs, fPs = test_nodal_graph_task_change(TDdf, tasks, 'PC')
-	print(fTs[fPs<.05])
-	#print(fdrcorrection(fPs[~np.isnan(fPs)])[0])
-
-
-
-	### Plotting
-	#%matplotlib qt
-	#plt.ion()
-	#sns.distplot(Ts[~np.isnan(Ts)])
-
-	# take a look at Yeo 400 ROIs
-	from nilearn import image
-	from nilearn import plotting
-	import nibabel as nib
-
-	ROIspath='/home/despoB/kaihwang/Rest/ROIs/400ROIs.nii.gz'
-	ROIs=image.load_img(ROIspath)
-
-	#plotting.plot_roi(ROIs, title="Yeo400")
-	#plotting.show()
-
-	#plotting.plot_glass_brain(mask_image(ROIspath, np.where(hPs<.05)[0]), title="h")
-	#plotting.plot_glass_brain(mask_image(ROIspath, np.where(fPs<.05)[0]), title="f")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+from nilearn.maskers import NiftiLabelsMasker, NiftiMasker
+import scipy.linalg as linalg
+
+def MTD(data,window):
+    """
+        creates a dynamic functional FC metric from 'data'
+        data: should be organized in 'time x nodes' matrix
+        window: smoothing parameter for dynamic coupling score
+
+        return:
+        mtd: time (minus 1) by roi by roi, describing the coupling across time between ROIs
+        sma: the same as mtd, but smoothed with a moving window
+
+
+        References:
+        Shine, J. M., Koyejo, O., Bell, P. T., Gorgolewski, K. J., Gilat, M., & Poldrack, R. A. (2015). Estimation of dynamic functional connectivity using Multiplication of Temporal Derivatives. NeuroImage, 122, 399-407.
+        Hwang, K., Shine, J. M., Cellier, D., & D’Esposito, M. (2020). The human intraparietal sulcus modulates task-evoked functional connectivity. Cerebral Cortex, 30(3), 875-887.
+    """
+    
+    #define variables
+    [tr,nodes] = data.shape
+    der = tr-1
+    td = np.zeros((der,nodes))
+    td_std = np.zeros((der,nodes))
+    data_std = np.zeros(nodes)
+    mtd = np.zeros((der,nodes,nodes))
+    sma = np.zeros((der,nodes*nodes))
+    
+    #calculate temporal derivative
+    for i in range(0,nodes):
+        for t in range(0,der):
+            td[t,i] = data[t+1,i] - data[t,i]
+    
+    
+    #standardize data
+    for i in range(0,nodes):
+        data_std[i] = np.std(td[:,i])
+    
+    td_std = td / data_std
+   
+   
+    #functional coupling score
+    for t in range(0,der):
+        for i in range(0,nodes):
+            for j in range(0,nodes):
+                mtd[t,i,j] = td_std[t,i] * td_std[t,j]
+
+
+    #temporal smoothing, using numpy convolve 
+    # kernel = np.ones(window) / window
+    # for i in range(0,nodes):
+    #     for j in range(0,nodes):
+    #         np.convolve(mtd[:,i,j], kernel, mode='valid')
+    
+    #temporal smoothing using pandas and center it
+    temp = np.reshape(mtd,[der,nodes*nodes])
+    sma = pd.DataFrame(temp).rolling(5, center=True).mean().to_numpy()
+    sma = np.reshape(sma,[der,nodes,nodes])
+    
+    return (mtd, sma)
+
+
+# load the LSS data. Is this the right path? there seems to be multiple deconvovle folders
+nii_data = nib.load("/Shared/lss_kahwang_hpc/data/QUANTUM_4S/Deconvolve_afni/sub-10263/ses-20240308/Quantum4S_sub-10263_ses-20240308_cue_LSS.nii.gz")
+
+print(nii_data.shape) #this should be in the shape of x by y by z by number of trials. 
+                      #note that we should have one beta for each trial, but if you use SPMG2 or other basis functions, we might get more than one beta for each trial,
+                      #in that case we need to only select the amplitude beta
+
+# Extract the trial by trial betas from the PFC ROIs you want to calculate dFC.
+# for now, I am just extracting signals from the whole Yeo/Shaeffer ROI template
+ROI_mask = nib.load("/Shared/lss_kahwang_hpc/ROIs/Schaefer400+Morel+BG_2.5.nii.gz")
+ROI_masker = NiftiLabelsMasker(ROI_mask)
+data = ROI_masker.fit_transform(nii_data)
+print(data.shape) # time by ROI
+
+# Select ROIs to calculate the dFC matrix
+# This is a critical step, we need to select these PFC ROIs in a principled way. 
+# Probably based on RSA or decoding results (those that encode task and state).
+# for now I am using two random ROIs. We would have to come up with a strategy for this
+
+cortical_ts = data[:, [348, 173]]
+
+# feed into the MTD function, smoothing window of 5
+mtd, sma = MTD(cortical_ts,5) #sma is the smoothed version that has NaNs because of the window
+                              #The reason we might want to use the smoothed version is  to reduce outliers from high-frequency noise from the derivative calculations
+
+# now we can build a regression model to solve
+# mtd = b * evoked_responses
+# where the "Y" is cortico-cortical DFC (mtd), and test how much of it can be explained by thalamic evoked responses
+# we can even add in model parameters as regressors, for example
+# mtd = b1*evoked_responses + b2*switch_probability + b3*evoked_responses*switch_probability.
+# below is the example of building the simple regression model, test it against whole-brian (mass univariate)
+
+brain_masker = NiftiMasker()
+brain_time_series = brain_masker.fit_transform(nii_data)
+print(brain_time_series) #time by voxels
+
+#build the X, if you want to include interaction terms from model parameters do it here
+X = np.array([np.ones(len(sma)),sma[:,0,1]]).T
+X = np.vstack((np.full(X.shape[1:], np.nan), X)) #add nan to the first element given its derivative, so the length matches the length of the timeseries
+
+#remove nans. We also need to remove "run breaks" later 
+nans = np.unique(np.where(np.isnan(X))[0])
+if any(nans):
+    X = np.delete(X, nans, axis=0)
+    brain_time_series = np.delete(brain_time_series, nans, axis=0)
+
+# fit the model, solve the betas
+results = linalg.lstsq(X, brain_time_series) #this is solving b in bX = brain_timeseries)
+
+# extract the betas, put it in brain space
+beta_nii = brain_masker.inverse_transform(results[0][1,:]) #the first X is intercept, so select the second one
+#you can save or plot this brain image, solve this sub by sub to do group stats using standard approaches. See if there are sig clusters in thalamus or anywhere else.
